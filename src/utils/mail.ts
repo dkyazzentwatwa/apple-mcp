@@ -65,58 +65,76 @@ interface EmailMessage {
   mailbox: string;
 }
 
-async function getUnreadMails(limit: number = 10): Promise<EmailMessage[]> {
+async function getUnreadMails(
+  limit: number = 10,
+  accountFilter?: string,
+  mailboxFilter?: string
+): Promise<EmailMessage[]> {
   try {
     if (!(await checkMailAccess())) {
       return [];
     }
 
+    // Build account filter clause for AppleScript
+    const accountClause = accountFilter
+      ? `set targetAccounts to (accounts whose name is "${accountFilter.replace(/"/g, '\\"')}")`
+      : `set targetAccounts to accounts`;
+
+    // Build mailbox filter - if specified, only look in that mailbox name
+    const mailboxCheck = mailboxFilter
+      ? `if (name of m) is not "${mailboxFilter.replace(/"/g, '\\"')}" then continue repeat`
+      : ``;
+
     // First, try with AppleScript which might be more reliable for this case
     try {
       const script = `
 tell application "Mail"
-    set allMailboxes to every mailbox
+    ${accountClause}
     set resultList to {}
 
-    -- First find account mailboxes with unread messages
-    repeat with m in allMailboxes
-        try
-            set unreadMessages to (messages of m whose read status is false)
-            if (count of unreadMessages) > 0 then
-                set msgLimit to ${limit}
-                if (count of unreadMessages) < msgLimit then
-                    set msgLimit to (count of unreadMessages)
-                end if
+    repeat with acct in targetAccounts
+        set acctMailboxes to mailboxes of acct
+        repeat with m in acctMailboxes
+            ${mailboxCheck}
+            try
+                set unreadMessages to (messages of m whose read status is false)
+                if (count of unreadMessages) > 0 then
+                    set msgLimit to ${limit}
+                    if (count of unreadMessages) < msgLimit then
+                        set msgLimit to (count of unreadMessages)
+                    end if
 
-                repeat with i from 1 to msgLimit
-                    try
-                        set currentMsg to item i of unreadMessages
-                        -- Basic email info
-                        set msgData to {subject:(subject of currentMsg), sender:(sender of currentMsg), ¬
-                                        date:(date sent of currentMsg) as string, mailbox:(name of m)}
-
-                        -- Try to get content if possible
+                    repeat with i from 1 to msgLimit
                         try
-                            set msgContent to content of currentMsg
-                            if length of msgContent > 500 then
-                                set msgContent to (text 1 thru 500 of msgContent) & "..."
-                            end if
-                            set msgData to msgData & {content:msgContent}
+                            set currentMsg to item i of unreadMessages
+                            -- Basic email info
+                            set msgData to {subject:(subject of currentMsg), sender:(sender of currentMsg), ¬
+                                            date:(date sent of currentMsg) as string, mailbox:(name of m)}
+
+                            -- Try to get content if possible
+                            try
+                                set msgContent to content of currentMsg
+                                if length of msgContent > 500 then
+                                    set msgContent to (text 1 thru 500 of msgContent) & "..."
+                                end if
+                                set msgData to msgData & {content:msgContent}
+                            on error
+                                set msgData to msgData & {content:"[Content not available]"}
+                            end try
+
+                            set end of resultList to msgData
                         on error
-                            set msgData to msgData & {content:"[Content not available]"}
+                            -- Skip problematic messages
                         end try
+                    end repeat
 
-                        set end of resultList to msgData
-                    on error
-                        -- Skip problematic messages
-                    end try
-                end repeat
-
-                if (count of resultList) ≥ ${limit} then exit repeat
-            end if
-        on error
-            -- Skip problematic mailboxes
-        end try
+                    if (count of resultList) ≥ ${limit} then exit repeat
+                end if
+            on error
+                -- Skip problematic mailboxes
+            end try
+        end repeat
+        if (count of resultList) ≥ ${limit} then exit repeat
     end repeat
 
     return resultList
@@ -336,6 +354,8 @@ end tell`);
 async function searchMails(
   searchTerm: string,
   limit: number = 10,
+  accountFilter?: string,
+  mailboxFilter?: string
 ): Promise<EmailMessage[]> {
   try {
     if (!(await checkMailAccess())) {
@@ -349,22 +369,37 @@ if application "Mail" is not running then
     delay 2
 end if`);
 
+    // Build account filter clause for AppleScript
+    const accountClause = accountFilter
+      ? `set targetAccounts to (accounts whose name is "${accountFilter.replace(/"/g, '\\"')}")`
+      : `set targetAccounts to accounts`;
+
+    // Build mailbox filter
+    const mailboxCheck = mailboxFilter
+      ? `if (name of currentBox) is not "${mailboxFilter.replace(/"/g, '\\"')}" then continue repeat`
+      : ``;
+
     // First try the AppleScript approach which might be more reliable
     try {
       const script = `
 tell application "Mail"
     set searchString to "${searchTerm.replace(/"/g, '\\"')}"
     set foundMsgs to {}
-    set allBoxes to every mailbox
+    ${accountClause}
 
-    repeat with currentBox in allBoxes
-        try
-            set boxMsgs to (messages of currentBox whose (subject contains searchString) or (content contains searchString))
-            set foundMsgs to foundMsgs & boxMsgs
-            if (count of foundMsgs) ≥ ${limit} then exit repeat
-        on error
-            -- Skip mailboxes that error out
-        end try
+    repeat with acct in targetAccounts
+        set acctMailboxes to mailboxes of acct
+        repeat with currentBox in acctMailboxes
+            ${mailboxCheck}
+            try
+                set boxMsgs to (messages of currentBox whose (subject contains searchString) or (content contains searchString))
+                set foundMsgs to foundMsgs & boxMsgs
+                if (count of foundMsgs) ≥ ${limit} then exit repeat
+            on error
+                -- Skip mailboxes that error out
+            end try
+        end repeat
+        if (count of foundMsgs) ≥ ${limit} then exit repeat
     end repeat
 
     set resultList to {}
@@ -374,9 +409,17 @@ tell application "Mail"
     repeat with i from 1 to msgCount
         try
             set currentMsg to item i of foundMsgs
+            -- Get content
+            set msgContent to "[Content not available]"
+            try
+                set msgContent to content of currentMsg
+                if length of msgContent > 500 then
+                    set msgContent to (text 1 thru 500 of msgContent) & "..."
+                end if
+            end try
             set msgInfo to {subject:subject of currentMsg, sender:sender of currentMsg, ¬
                             date:(date sent of currentMsg) as string, isRead:read status of currentMsg, ¬
-                            boxName:name of (mailbox of currentMsg)}
+                            boxName:name of (mailbox of currentMsg), content:msgContent}
             set end of resultList to msgInfo
         on error
             -- Skip messages that error out
@@ -397,7 +440,7 @@ end tell`;
               subject: msg.subject || "No subject",
               sender: msg.sender || "Unknown sender",
               dateSent: msg.date || new Date().toString(),
-              content: "[Content not available through AppleScript method]",
+              content: msg.content || "[Content not available]",
               isRead: msg.isRead || false,
               mailbox: msg.boxName || "Unknown mailbox",
             }));
@@ -413,65 +456,86 @@ end tell`;
 
     // JXA approach as fallback
     const searchResults: EmailMessage[] = await run(
-      (searchTerm: string, limit: number) => {
+      (args: { searchTerm: string, limit: number, accountFilter?: string, mailboxFilter?: string }) => {
         const Mail = Application("Mail");
         const results: any[] = [];
 
-        // Search in the most common mailboxes
+        // Get accounts to search (filtered or all)
         try {
-          const mailboxes = Mail.mailboxes();
+          const accounts = Mail.accounts();
 
-          for (const mailbox of mailboxes) {
+          for (const account of accounts) {
             try {
-              // Try to find messages with the search term in subject or content
-              let messages;
-              try {
-                messages = mailbox.messages.whose({
-                  _or: [
-                    { subject: { _contains: searchTerm } },
-                    { content: { _contains: searchTerm } },
-                  ],
-                })();
-              } catch (queryError) {
+              // Skip if account filter specified and doesn't match
+              if (args.accountFilter && account.name() !== args.accountFilter) {
                 continue;
               }
 
-              // Take only the most recent messages up to the limit
-              const count = Math.min(messages.length, limit);
+              const mailboxes = account.mailboxes();
 
-              for (let i = 0; i < count; i++) {
+              for (const mailbox of mailboxes) {
                 try {
-                  const msg = messages[i];
-                  results.push({
-                    subject: msg.subject(),
-                    sender: msg.sender(),
-                    dateSent: msg.dateSent().toString(),
-                    content: msg.content()
-                      ? msg.content().substring(0, 500)
-                      : "[No content]", // Limit content length
-                    isRead: msg.readStatus(),
-                    mailbox: mailbox.name(),
-                  });
-                } catch (msgError) {
-                  // Skip problematic messages
+                  // Skip if mailbox filter specified and doesn't match
+                  if (args.mailboxFilter && mailbox.name() !== args.mailboxFilter) {
+                    continue;
+                  }
+
+                  // Try to find messages with the search term in subject or content
+                  let messages;
+                  try {
+                    messages = mailbox.messages.whose({
+                      _or: [
+                        { subject: { _contains: args.searchTerm } },
+                        { content: { _contains: args.searchTerm } },
+                      ],
+                    })();
+                  } catch (queryError) {
+                    continue;
+                  }
+
+                  // Take only the most recent messages up to the limit
+                  const count = Math.min(messages.length, args.limit - results.length);
+
+                  for (let i = 0; i < count; i++) {
+                    try {
+                      const msg = messages[i];
+                      results.push({
+                        subject: msg.subject(),
+                        sender: msg.sender(),
+                        dateSent: msg.dateSent().toString(),
+                        content: msg.content()
+                          ? msg.content().substring(0, 500)
+                          : "[No content]",
+                        isRead: msg.readStatus(),
+                        mailbox: `${account.name()} - ${mailbox.name()}`,
+                      });
+                    } catch (msgError) {
+                      // Skip problematic messages
+                    }
+                  }
+
+                  if (results.length >= args.limit) {
+                    break;
+                  }
+                } catch (boxError) {
+                  // Skip problematic mailboxes
                 }
               }
 
-              if (results.length >= limit) {
+              if (results.length >= args.limit) {
                 break;
               }
-            } catch (boxError) {
-              // Skip problematic mailboxes
+            } catch (accError) {
+              // Skip problematic accounts
             }
           }
         } catch (mbError) {
           // Return empty results on error
         }
 
-        return results.slice(0, limit);
+        return results.slice(0, args.limit);
       },
-      searchTerm,
-      limit,
+      { searchTerm, limit, accountFilter, mailboxFilter },
     );
 
     return searchResults;

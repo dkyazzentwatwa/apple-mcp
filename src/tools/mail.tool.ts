@@ -15,7 +15,11 @@ export async function handleMail(args: unknown) {
   try {
     switch (parsed.operation) {
       case 'unread': {
-        const emails = await mailUtil.getUnreadMails(parsed.limit || 10);
+        const emails = await mailUtil.getUnreadMails(
+          parsed.limit || 10,
+          parsed.account,
+          parsed.mailbox
+        );
         if (emails.length === 0) {
           return {
             content: [{
@@ -38,7 +42,12 @@ export async function handleMail(args: unknown) {
       }
 
       case 'search': {
-        const emails = await mailUtil.searchMails(parsed.searchTerm, parsed.limit || 10);
+        const emails = await mailUtil.searchMails(
+          parsed.searchTerm,
+          parsed.limit || 10,
+          parsed.account,
+          parsed.mailbox
+        );
         if (emails.length === 0) {
           return {
             content: [{
@@ -49,7 +58,7 @@ export async function handleMail(args: unknown) {
           };
         }
         const emailsText = emails
-          .map(email => `From: ${email.sender}\nSubject: ${email.subject}\nDate: ${email.dateSent}\nMailbox: ${email.mailbox}`)
+          .map(email => `From: ${email.sender}\nSubject: ${email.subject}\nDate: ${email.dateSent}\nMailbox: ${email.mailbox}\n---\n${email.content}`)
           .join('\n\n');
         return {
           content: [{

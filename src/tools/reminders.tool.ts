@@ -75,13 +75,14 @@ export async function handleReminders(args: unknown) {
         const reminder = await remindersUtil.createReminder(
           parsed.name,
           parsed.listName || 'Reminders',
+          parsed.listId,
           parsed.notes,
           parsed.dueDate
         );
         return {
           content: [{
             type: 'text' as const,
-            text: `Created reminder "${reminder.name}" in list "${reminder.listName}"${reminder.dueDate ? ` (Due: ${reminder.dueDate})` : ''}`
+            text: `Created reminder "${reminder.name}" (ID: ${reminder.id}) in list "${reminder.listName}"${reminder.dueDate ? ` (Due: ${reminder.dueDate})` : ''}`
           }],
           isError: false
         };
@@ -153,6 +154,47 @@ export async function handleReminders(args: unknown) {
             text: `Created list "${list.name}" (ID: ${list.id})`
           }],
           isError: false
+        };
+      }
+
+      case 'complete': {
+        const reminder = await remindersUtil.completeReminder(
+          parsed.reminderId,
+          parsed.completed ?? true
+        );
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `Marked "${reminder.name}" as ${reminder.completed ? 'complete' : 'incomplete'}`
+          }],
+          isError: false
+        };
+      }
+
+      case 'update': {
+        const reminder = await remindersUtil.updateReminder(
+          parsed.reminderId,
+          parsed.name,
+          parsed.notes,
+          parsed.dueDate
+        );
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `Updated reminder "${reminder.name}"${reminder.dueDate ? ` (Due: ${reminder.dueDate})` : ''}`
+          }],
+          isError: false
+        };
+      }
+
+      case 'delete': {
+        const result = await remindersUtil.deleteReminder(parsed.reminderId);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
         };
       }
 

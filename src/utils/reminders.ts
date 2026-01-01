@@ -300,41 +300,54 @@ async function searchReminders(searchText: string): Promise<Reminder[]> {
  * Create a new reminder
  * @param name Name of the reminder
  * @param listName Name of the list to add the reminder to (creates if doesn't exist)
+ * @param listId Optional ID of the list (takes precedence over listName)
  * @param notes Optional notes for the reminder
  * @param dueDate Optional due date for the reminder (ISO string)
  * @returns The created reminder
  */
-async function createReminder(name: string, listName: string = "Reminders", notes?: string, dueDate?: string): Promise<Reminder> {
-    const result = await run((name: string, listName: string, notes: string | undefined, dueDate: string | undefined) => {
+async function createReminder(name: string, listName: string = "Reminders", listId?: string, notes?: string, dueDate?: string): Promise<Reminder> {
+    const result = await run((args: { name: string, listName: string, listId?: string, notes?: string, dueDate?: string }) => {
         const Reminders = Application('Reminders');
-        
-        // Find or create the list
+
+        // Find the list by ID or name
         let list;
-        const existingLists = Reminders.lists.whose({name: listName})();
-        
-        if (existingLists.length > 0) {
-            list = existingLists[0];
+        if (args.listId) {
+            // Use listId if provided (more precise)
+            try {
+                list = Reminders.lists.byId(args.listId);
+                // Verify the list exists by accessing a property
+                list.name();
+            } catch (e) {
+                throw new Error(`List with ID "${args.listId}" not found`);
+            }
         } else {
-            // Create a new list if it doesn't exist
-            list = Reminders.make({new: 'list', withProperties: {name: listName}});
+            // Fall back to listName
+            const existingLists = Reminders.lists.whose({name: args.listName})();
+
+            if (existingLists.length > 0) {
+                list = existingLists[0];
+            } else {
+                // Create a new list if it doesn't exist
+                list = Reminders.make({new: 'list', withProperties: {name: args.listName}});
+            }
         }
-        
+
         // Create the reminder properties
         const reminderProps: any = {
-            name: name
+            name: args.name
         };
-        
-        if (notes) {
-            reminderProps.body = notes;
+
+        if (args.notes) {
+            reminderProps.body = args.notes;
         }
-        
-        if (dueDate) {
-            reminderProps.dueDate = new Date(dueDate);
+
+        if (args.dueDate) {
+            reminderProps.dueDate = new Date(args.dueDate);
         }
-        
+
         // Create the reminder
         const newReminder = list.make({new: 'reminder', withProperties: reminderProps});
-        
+
         return {
             name: newReminder.name(),
             id: newReminder.id(),
@@ -343,8 +356,8 @@ async function createReminder(name: string, listName: string = "Reminders", note
             dueDate: newReminder.dueDate() ? newReminder.dueDate().toISOString() : null,
             listName: list.name()
         };
-    }, name, listName, notes, dueDate);
-    
+    }, { name, listName, listId, notes, dueDate });
+
     return result as Reminder;
 }
 
@@ -422,4 +435,139 @@ async function createList(listName: string): Promise<ReminderList> {
     return result as ReminderList;
 }
 
-export default { getAllLists, getAllReminders, searchReminders, createReminder, openReminder, getRemindersFromListById, createList }; 
+/**
+ * Mark a reminder as complete or incomplete
+ * @param reminderId ID of the reminder
+ * @param completed Whether the reminder should be marked complete (true) or incomplete (false)
+ * @returns The updated reminder
+ */
+async function completeReminder(reminderId: string, completed: boolean = true): Promise<Reminder> {
+    const result = await run((args: { reminderId: string, completed: boolean }) => {
+        const Reminders = Application('Reminders');
+
+        // Find the reminder across all lists
+        const lists = Reminders.lists();
+        for (const list of lists) {
+            try {
+                const reminder = list.reminders.byId(args.reminderId);
+                // Verify reminder exists by accessing a property
+                reminder.name();
+
+                // Update the completed status
+                reminder.completed = args.completed;
+
+                return {
+                    name: reminder.name(),
+                    id: reminder.id(),
+                    body: reminder.body() || "",
+                    completed: reminder.completed(),
+                    dueDate: reminder.dueDate() ? reminder.dueDate().toISOString() : null,
+                    listName: list.name()
+                };
+            } catch (e) {
+                // Reminder not in this list, continue searching
+            }
+        }
+
+        throw new Error(`Reminder with ID "${args.reminderId}" not found`);
+    }, { reminderId, completed });
+
+    return result as Reminder;
+}
+
+/**
+ * Update a reminder's properties
+ * @param reminderId ID of the reminder to update
+ * @param name Optional new name
+ * @param notes Optional new notes
+ * @param dueDate Optional new due date (ISO string, or empty string to clear)
+ * @returns The updated reminder
+ */
+async function updateReminder(reminderId: string, name?: string, notes?: string, dueDate?: string): Promise<Reminder> {
+    const result = await run((args: { reminderId: string, name?: string, notes?: string, dueDate?: string }) => {
+        const Reminders = Application('Reminders');
+
+        // Find the reminder across all lists
+        const lists = Reminders.lists();
+        for (const list of lists) {
+            try {
+                const reminder = list.reminders.byId(args.reminderId);
+                // Verify reminder exists by accessing a property
+                reminder.name();
+
+                // Update properties if provided
+                if (args.name !== undefined) {
+                    reminder.name = args.name;
+                }
+
+                if (args.notes !== undefined) {
+                    reminder.body = args.notes;
+                }
+
+                if (args.dueDate !== undefined) {
+                    if (args.dueDate === '') {
+                        // Clear the due date
+                        reminder.dueDate = null;
+                    } else {
+                        reminder.dueDate = new Date(args.dueDate);
+                    }
+                }
+
+                return {
+                    name: reminder.name(),
+                    id: reminder.id(),
+                    body: reminder.body() || "",
+                    completed: reminder.completed(),
+                    dueDate: reminder.dueDate() ? reminder.dueDate().toISOString() : null,
+                    listName: list.name()
+                };
+            } catch (e) {
+                // Reminder not in this list, continue searching
+            }
+        }
+
+        throw new Error(`Reminder with ID "${args.reminderId}" not found`);
+    }, { reminderId, name, notes, dueDate });
+
+    return result as Reminder;
+}
+
+/**
+ * Delete a reminder
+ * @param reminderId ID of the reminder to delete
+ * @returns Success status
+ */
+async function deleteReminder(reminderId: string): Promise<{ success: boolean, message: string }> {
+    const result = await run((reminderId: string) => {
+        const Reminders = Application('Reminders');
+
+        // Find the reminder across all lists
+        const lists = Reminders.lists();
+        for (const list of lists) {
+            try {
+                const reminder = list.reminders.byId(reminderId);
+                // Verify reminder exists by getting its name
+                const reminderName = reminder.name();
+
+                // Delete the reminder
+                reminder.delete();
+
+                return {
+                    success: true,
+                    message: `Deleted reminder "${reminderName}"`
+                };
+            } catch (e) {
+                // Reminder not in this list, continue searching
+            }
+        }
+
+        return {
+            success: false,
+            message: `Reminder with ID "${reminderId}" not found`
+        };
+    }, reminderId);
+
+    return result as { success: boolean, message: string };
+}
+
+export default { getAllLists, getAllReminders, searchReminders, createReminder, openReminder, getRemindersFromListById, createList, completeReminder, updateReminder, deleteReminder }; 

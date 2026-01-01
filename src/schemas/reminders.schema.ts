@@ -18,6 +18,7 @@ const CreateReminderSchema = z.object({
   operation: z.literal('create').describe('Create a new reminder in a specified list.'),
   name: z.string().min(1, 'name is required for create operation').describe('Name of the reminder to create'),
   listName: z.string().optional().describe('Name of the list to create the reminder in (default: Reminders)'),
+  listId: z.string().optional().describe('ID of the list to create the reminder in (takes precedence over listName)'),
   notes: z.string().optional().describe('Additional notes for the reminder'),
   dueDate: z.string().optional().describe('Due date for the reminder in ISO format')
 });
@@ -38,6 +39,25 @@ const CreateListSchema = z.object({
   listName: z.string().min(1, 'listName is required').describe('Name for the new reminder list')
 });
 
+const CompleteReminderSchema = z.object({
+  operation: z.literal('complete').describe('Mark a reminder as complete or incomplete.'),
+  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to complete'),
+  completed: z.boolean().default(true).describe('Set to true to mark complete, false to mark incomplete')
+});
+
+const UpdateReminderSchema = z.object({
+  operation: z.literal('update').describe('Update a reminder\'s properties.'),
+  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to update'),
+  name: z.string().optional().describe('New name for the reminder'),
+  notes: z.string().optional().describe('New notes for the reminder'),
+  dueDate: z.string().optional().describe('New due date in ISO format (or empty string to clear)')
+});
+
+const DeleteReminderSchema = z.object({
+  operation: z.literal('delete').describe('Delete a reminder.'),
+  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to delete')
+});
+
 export const RemindersArgsSchema = z.discriminatedUnion('operation', [
   ListRemindersSchema,
   SearchRemindersSchema,
@@ -45,7 +65,10 @@ export const RemindersArgsSchema = z.discriminatedUnion('operation', [
   CreateReminderSchema,
   ListByIdSchema,
   GetByListNameSchema,
-  CreateListSchema
+  CreateListSchema,
+  CompleteReminderSchema,
+  UpdateReminderSchema,
+  DeleteReminderSchema
 ]);
 
 export type RemindersArgs = z.infer<typeof RemindersArgsSchema>;

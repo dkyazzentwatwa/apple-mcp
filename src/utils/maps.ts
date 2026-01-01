@@ -285,8 +285,8 @@ async function saveLocation(name: string, address: string): Promise<SaveResult> 
  * @param transportType Type of transport to use (default is driving)
  */
 async function getDirections(
-    fromAddress: string, 
-    toAddress: string, 
+    fromAddress: string,
+    toAddress: string,
     transportType: 'driving' | 'walking' | 'transit' = 'driving'
 ): Promise<DirectionResult> {
     try {
@@ -297,29 +297,37 @@ async function getDirections(
             };
         }
 
-        console.error(`getDirections - Getting directions from "${fromAddress}" to "${toAddress}"`);
+        // Map transport type to Apple Maps URL scheme parameter
+        const dirflgMap: Record<string, string> = {
+            'driving': 'd',
+            'walking': 'w',
+            'transit': 'r'
+        };
+        const dirflg = dirflgMap[transportType] || 'd';
 
-        const result = await run((args: { 
-            fromAddress: string, 
-            toAddress: string, 
-            transportType: string 
+        const result = await run((args: {
+            fromAddress: string,
+            toAddress: string,
+            dirflg: string,
+            transportType: string
         }) => {
             try {
+                const app = Application.currentApplication();
+                app.includeStandardAdditions = true;
+
                 const Maps = Application("Maps");
                 Maps.activate();
-                
-                // Ask for directions
-                Maps.getDirections({
-                    from: args.fromAddress,
-                    to: args.toAddress,
-                    by: args.transportType
-                });
-                
+
+                // Use URL scheme for directions - this is more reliable than JXA methods
+                const encodedFrom = encodeURIComponent(args.fromAddress);
+                const encodedTo = encodeURIComponent(args.toAddress);
+                const url = `maps://?saddr=${encodedFrom}&daddr=${encodedTo}&dirflg=${args.dirflg}`;
+
+                app.openLocation(url);
+
                 // Wait for directions to load
                 delay(2);
-                
-                // There's no direct API to get the route details
-                // We'll return basic success and let the Maps UI show the route
+
                 return {
                     success: true,
                     message: `Displaying directions from "${args.fromAddress}" to "${args.toAddress}" by ${args.transportType}`,
@@ -336,8 +344,8 @@ async function getDirections(
                     message: `Error getting directions: ${e}`
                 };
             }
-        }, { fromAddress, toAddress, transportType }) as DirectionResult;
-        
+        }, { fromAddress, toAddress, dirflg, transportType }) as DirectionResult;
+
         return result;
     } catch (error) {
         return {

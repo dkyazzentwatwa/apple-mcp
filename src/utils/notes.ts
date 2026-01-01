@@ -121,11 +121,11 @@ async function createNote(title: string, body: string, folderName: string = 'Cla
                     folderName: actualFolderName,
                     usedDefaultFolder: usedDefaultFolder
                 };
-            } catch (scriptError) {
-                throw new Error(`AppleScript error: ${scriptError.message || String(scriptError)}`);
+            } catch (scriptError: unknown) {
+                throw new Error(`AppleScript error: ${scriptError instanceof Error ? scriptError.message : String(scriptError)}`);
             }
-        }, title, formattedBody, folderName);
-        
+        }, title, formattedBody, folderName) as CreateNoteResult;
+
         return result;
     } catch (error) {
         return {

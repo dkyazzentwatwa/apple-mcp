@@ -244,31 +244,25 @@ end tell`);
     // Fallback to JXA approach
     const unreadMails: EmailMessage[] = await run((limit: number) => {
       const Mail = Application("Mail");
-      const results = [];
+      const results: any[] = [];
 
       try {
         // Get all accounts first
         const accounts = Mail.accounts();
-        console.error(`Found ${accounts.length} accounts`);
 
         // Go through all accounts to find mailboxes
         for (const account of accounts) {
           try {
             const accountName = account.name();
-            console.error(`Processing account: ${accountName}`);
 
             // Try to get mailboxes for this account
             try {
               const accountMailboxes = account.mailboxes();
-              console.error(
-                `Account ${accountName} has ${accountMailboxes.length} mailboxes`,
-              );
 
               // Process each mailbox
               for (const mailbox of accountMailboxes) {
                 try {
                   const boxName = mailbox.name();
-                  console.error(`Checking ${boxName} in ${accountName}`);
 
                   // Try to get unread messages
                   let unreadMessages;
@@ -276,9 +270,6 @@ end tell`);
                     unreadMessages = mailbox.messages.whose({
                       readStatus: false,
                     })();
-                    console.error(
-                      `Found ${unreadMessages.length} unread in ${boxName}`,
-                    );
 
                     // Process unread messages
                     const count = Math.min(
@@ -299,16 +290,14 @@ end tell`);
                           mailbox: `${accountName} - ${boxName}`,
                         });
                       } catch (msgError) {
-                        console.error(`Error with message: ${msgError}`);
+                        // Skip problematic messages
                       }
                     }
                   } catch (unreadError) {
-                    console.error(
-                      `Error getting unread for ${boxName}: ${unreadError}`,
-                    );
+                    // Skip mailboxes that can't be queried
                   }
                 } catch (boxError) {
-                  console.error(`Error with mailbox: ${boxError}`);
+                  // Skip problematic mailboxes
                 }
 
                 // If we have enough messages, stop
@@ -317,9 +306,7 @@ end tell`);
                 }
               }
             } catch (mbError) {
-              console.error(
-                `Error getting mailboxes for ${accountName}: ${mbError}`,
-              );
+              // Skip accounts with mailbox access issues
             }
 
             // If we have enough messages, stop
@@ -327,14 +314,13 @@ end tell`);
               break;
             }
           } catch (accError) {
-            console.error(`Error with account: ${accError}`);
+            // Skip problematic accounts
           }
         }
       } catch (error) {
-        console.error(`General error: ${error}`);
+        // Return empty results on general error
       }
 
-      console.error(`Returning ${results.length} unread messages`);
       return results;
     }, limit);
 
@@ -429,19 +415,14 @@ end tell`;
     const searchResults: EmailMessage[] = await run(
       (searchTerm: string, limit: number) => {
         const Mail = Application("Mail");
-        const results = [];
-
-        console.error(`Searching for "${searchTerm}" in mailboxes...`);
+        const results: any[] = [];
 
         // Search in the most common mailboxes
         try {
           const mailboxes = Mail.mailboxes();
-          console.error(`Found ${mailboxes.length} mailboxes to search`);
 
           for (const mailbox of mailboxes) {
             try {
-              console.error(`Searching in mailbox: ${mailbox.name()}`);
-
               // Try to find messages with the search term in subject or content
               let messages;
               try {
@@ -451,15 +432,7 @@ end tell`;
                     { content: { _contains: searchTerm } },
                   ],
                 })();
-
-                console.error(
-                  `Found ${messages.length} matching messages in ${mailbox.name()}`,
-                );
               } catch (queryError) {
-                console.error(
-                  `Error querying messages in ${mailbox.name()}:`,
-                  queryError,
-                );
                 continue;
               }
 
@@ -480,7 +453,7 @@ end tell`;
                     mailbox: mailbox.name(),
                   });
                 } catch (msgError) {
-                  console.error("Error processing message:", msgError);
+                  // Skip problematic messages
                 }
               }
 
@@ -488,14 +461,13 @@ end tell`;
                 break;
               }
             } catch (boxError) {
-              console.error(`Error with mailbox ${mailbox.name()}:`, boxError);
+              // Skip problematic mailboxes
             }
           }
         } catch (mbError) {
-          console.error("Error getting mailboxes:", mbError);
+          // Return empty results on error
         }
 
-        console.error(`Returning ${results.length} search results`);
         return results.slice(0, limit);
       },
       searchTerm,
@@ -642,8 +614,6 @@ end if`);
         const mailboxes = Mail.mailboxes();
 
         if (!mailboxes || mailboxes.length === 0) {
-          console.error("No mailboxes found directly");
-
           // Try alternative approach
           try {
             const result = Mail.execute({
@@ -652,11 +622,10 @@ end if`);
             });
 
             if (result && result.length > 0) {
-              console.error("Found mailboxes via execute method");
               return result;
             }
           } catch (execError) {
-            console.error("Error with execute method:", execError);
+            // Alternative method failed
           }
 
           return [];
@@ -666,12 +635,10 @@ end if`);
           try {
             return box.name();
           } catch (nameError) {
-            console.error("Error getting mailbox name:", nameError);
             return "Unknown mailbox";
           }
         });
       } catch (error) {
-        console.error("Error accessing mailboxes:", error);
         return [];
       }
     });

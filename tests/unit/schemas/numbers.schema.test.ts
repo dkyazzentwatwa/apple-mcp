@@ -469,6 +469,283 @@ describe('NumbersArgsSchema', () => {
     });
   });
 
+  describe('formatCell operation', () => {
+    it('should accept formatCell with required parameters only', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept formatCell with backgroundColor', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        backgroundColor: '#FF0000'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept formatCell with named color', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        backgroundColor: 'red',
+        textColor: 'white'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept formatCell with font properties', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        fontName: 'Arial',
+        fontSize: 14
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept formatCell with alignment', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        alignment: 'center',
+        verticalAlignment: 'middle'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject formatCell with invalid alignment', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'formatCell',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        alignment: 'invalid'
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('setNumberFormat operation', () => {
+    it('should accept setNumberFormat with currency format', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setNumberFormat',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        format: 'currency'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept setNumberFormat with percent format', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setNumberFormat',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        format: 'percent'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept all valid format types', () => {
+      const formats = [
+        'automatic', 'currency', 'percent', 'number', 'scientific',
+        'fraction', 'date and time', 'duration', 'text', 'checkbox', 'rating'
+      ];
+
+      formats.forEach(format => {
+        const result = NumbersArgsSchema.safeParse({
+          operation: 'setNumberFormat',
+          documentName: 'Budget 2024',
+          sheetName: 'Monthly',
+          cellReference: 'A1',
+          format
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    it('should reject setNumberFormat with invalid format', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setNumberFormat',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1',
+        format: 'invalid'
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject setNumberFormat without format', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setNumberFormat',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        cellReference: 'A1'
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('setColumnWidth operation', () => {
+    it('should accept setColumnWidth with required parameters', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setColumnWidth',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        column: 'A',
+        width: 100
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept setColumnWidth with multi-letter column', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setColumnWidth',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        column: 'AA',
+        width: 150
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject setColumnWidth with width < 10', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setColumnWidth',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        column: 'A',
+        width: 5
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject setColumnWidth without column', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setColumnWidth',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        width: 100
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('setRowHeight operation', () => {
+    it('should accept setRowHeight with required parameters', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setRowHeight',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        row: 1,
+        height: 30
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject setRowHeight with row < 1', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setRowHeight',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        row: 0,
+        height: 30
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject setRowHeight with height < 10', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'setRowHeight',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        row: 1,
+        height: 5
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('mergeCells operation', () => {
+    it('should accept mergeCells with required parameters', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'mergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        range: 'A1:B2'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept mergeCells with tableName', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'mergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        range: 'A1:B2',
+        tableName: 'Table 1'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject mergeCells without range', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'mergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly'
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('unmergeCells operation', () => {
+    it('should accept unmergeCells with required parameters', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'unmergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        range: 'A1:B2'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept unmergeCells with tableName', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'unmergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly',
+        range: 'A1:B2',
+        tableName: 'Table 1'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject unmergeCells without range', () => {
+      const result = NumbersArgsSchema.safeParse({
+        operation: 'unmergeCells',
+        documentName: 'Budget 2024',
+        sheetName: 'Monthly'
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('invalid operations', () => {
     it('should reject unknown operation', () => {
       const result = NumbersArgsSchema.safeParse({ operation: 'deleteDocument' });

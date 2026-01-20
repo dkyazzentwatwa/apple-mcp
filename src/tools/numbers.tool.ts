@@ -6,7 +6,28 @@ import type { TableData, CellMatch } from '../utils/numbers.js';
 
 export const NUMBERS_TOOL: Tool = {
   name: 'numbers',
-  description: 'Read and write data in Apple Numbers spreadsheets. Supports listing documents, reading/writing data, searching, row manipulation, and formula operations. Documents must be open in Numbers to access them.',
+  description: `Read and write data in Apple Numbers spreadsheets with intelligent table structure awareness.
+
+IMPORTANT USAGE PATTERNS:
+1. ALWAYS call getTableStructure FIRST before adding data to understand:
+   - Where headers end (dataStartRow tells you where data begins)
+   - Where footers begin (dataEndRow tells you where data ends)
+   - Proper insertion points to avoid breaking document structure
+
+2. When adding data with appendRow:
+   - Use insertPosition='after-headers' to add data RIGHT AFTER the header row (typically row 2)
+   - Use insertPosition='after-data' (DEFAULT) to append to the data section BEFORE footers/summaries
+   - AVOID insertPosition='at-end' unless you specifically want to add footer/summary rows
+
+3. Document structure (typical):
+   - Row 1: Headers
+   - Rows 2-N: Data
+   - Rows N+1 onwards: Footers/summaries (if any)
+
+Supports: table structure analysis, reading/writing data, searching, row manipulation, formula operations,
+and comprehensive formatting (colors, fonts, alignment, number formats, column widths, row heights, cell merging).
+
+Documents must be open in Numbers to access them.`,
   inputSchema: createToolSchema(NumbersArgsSchema)
 };
 
@@ -82,6 +103,30 @@ export async function handleNumbers(args: unknown) {
         };
       }
 
+      case 'getTableStructure': {
+        const structure = await numbersUtil.getTableStructure(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: `## Table Structure: ${structure.tableName}\n\n` +
+                  `**Total Rows:** ${structure.totalRows} | **Total Columns:** ${structure.totalColumns}\n` +
+                  `**Header Rows:** ${structure.headerRowCount} | **Footer Rows:** ${structure.footerRowCount}\n` +
+                  `**Headers Frozen:** ${structure.headersFrozen ? 'Yes' : 'No'}\n\n` +
+                  `**Data Section:**\n` +
+                  `- Starts at row ${structure.dataStartRow} (first data row after headers)\n` +
+                  `- Ends at row ${structure.dataEndRow} (last data row before footers)\n\n` +
+                  `**💡 Tip:** Use \`insertPosition='after-headers'\` to add data at row ${structure.dataStartRow}, ` +
+                  `or \`insertPosition='after-data'\` to append at row ${structure.dataEndRow + 1}.`
+          }],
+          isError: false
+        };
+      }
+
       case 'getSheetData': {
         const data = await numbersUtil.getSheetData(
           parsed.documentName,
@@ -127,7 +172,8 @@ export async function handleNumbers(args: unknown) {
           parsed.documentName,
           parsed.sheetName,
           parsed.values,
-          parsed.tableName
+          parsed.tableName,
+          parsed.insertPosition
         );
 
         return {
@@ -249,6 +295,120 @@ export async function handleNumbers(args: unknown) {
           parsed.sheetName,
           parsed.cellReference,
           parsed.formula,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'formatCell': {
+        const result = await numbersUtil.formatCell(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.cellReference,
+          {
+            backgroundColor: parsed.backgroundColor,
+            textColor: parsed.textColor,
+            fontName: parsed.fontName,
+            fontSize: parsed.fontSize,
+            alignment: parsed.alignment,
+            verticalAlignment: parsed.verticalAlignment,
+            textWrap: parsed.textWrap
+          },
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'setNumberFormat': {
+        const result = await numbersUtil.setNumberFormat(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.cellReference,
+          parsed.format,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'setColumnWidth': {
+        const result = await numbersUtil.setColumnWidth(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.column,
+          parsed.width,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'setRowHeight': {
+        const result = await numbersUtil.setRowHeight(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.row,
+          parsed.height,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'mergeCells': {
+        const result = await numbersUtil.mergeCells(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.range,
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'unmergeCells': {
+        const result = await numbersUtil.unmergeCells(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.range,
           parsed.tableName
         );
 

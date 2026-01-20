@@ -1,4 +1,5 @@
 import { run } from '@jxa/run';
+import { runAppleScript } from 'run-applescript';
 
 // Type definitions
 export interface NumbersDocument {
@@ -27,9 +28,76 @@ export interface CellMatch {
   column: string;
 }
 
+export interface TableStructure {
+  totalRows: number;
+  totalColumns: number;
+  headerRowCount: number;
+  headerColumnCount: number;
+  footerRowCount: number;
+  dataStartRow: number;
+  dataEndRow: number;
+  headersFrozen: boolean;
+  tableName: string;
+}
+
 interface CreateNoteResult {
   success: boolean;
   message?: string;
+}
+
+/**
+ * Named color mapping to hex values
+ */
+const NAMED_COLORS: Record<string, string> = {
+  // Basic colors
+  red: '#FF0000',
+  green: '#00FF00',
+  blue: '#0000FF',
+  yellow: '#FFFF00',
+  cyan: '#00FFFF',
+  magenta: '#FF00FF',
+  black: '#000000',
+  white: '#FFFFFF',
+  gray: '#808080',
+  grey: '#808080',
+
+  // Extended colors
+  orange: '#FFA500',
+  purple: '#800080',
+  pink: '#FFC0CB',
+  brown: '#A52A2A',
+  lime: '#00FF00',
+  navy: '#000080',
+  teal: '#008080',
+  maroon: '#800000',
+  olive: '#808000',
+  silver: '#C0C0C0'
+};
+
+/**
+ * Convert hex color to AppleScript RGB values (0-65535 range)
+ */
+export function hexToAppleScriptRGB(hexColor: string): { r: number; g: number; b: number } {
+  // Handle named colors
+  const color = hexColor.toLowerCase();
+  const hex = NAMED_COLORS[color] ? NAMED_COLORS[color].replace('#', '') : hexColor.replace('#', '');
+
+  // Validate hex format
+  if (!/^[0-9A-Fa-f]{6}$/.test(hex)) {
+    throw new Error(`Invalid color: ${hexColor}. Use hex format (#RRGGBB) or named colors (red, blue, etc.)`);
+  }
+
+  // Parse RGB components (0-255)
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Convert to 0-65535 range (AppleScript uses 16-bit values)
+  return {
+    r: Math.round((r / 255) * 65535),
+    g: Math.round((g / 255) * 65535),
+    b: Math.round((b / 255) * 65535)
+  };
 }
 
 /**
@@ -217,6 +285,79 @@ async function getDocumentInfo(documentName: string): Promise<NumbersDocument> {
 }
 
 /**
+ * Get table structure information (headers, footers, data boundaries)
+ */
+async function getTableStructure(
+  documentName: string,
+  sheetName: string,
+  tableName?: string
+): Promise<TableStructure> {
+  try {
+    const structure = await run((args: {
+      documentName: string;
+      sheetName: string;
+      tableName?: string;
+    }) => {
+      const Numbers = Application('Numbers');
+      const docs = Numbers.documents.whose({ name: args.documentName })();
+
+      if (docs.length === 0) {
+        throw new Error(`Document "${args.documentName}" not found. Make sure it's open in Numbers.`);
+      }
+
+      const doc = docs[0];
+      const sheets = doc.sheets.whose({ name: args.sheetName })();
+
+      if (sheets.length === 0) {
+        throw new Error(`Sheet "${args.sheetName}" not found in document "${args.documentName}".`);
+      }
+
+      const sheet = sheets[0];
+      const allTables = sheet.tables();
+
+      let table;
+      if (args.tableName) {
+        const namedTables = sheet.tables.whose({ name: args.tableName })();
+        if (namedTables.length === 0) {
+          throw new Error(`Table "${args.tableName}" not found in sheet "${args.sheetName}".`);
+        }
+        table = namedTables[0];
+      } else {
+        if (allTables.length === 0) {
+          throw new Error(`No tables found in sheet "${args.sheetName}".`);
+        }
+        table = allTables[0];
+      }
+
+      // Get table structure properties
+      const headerRows = table.headerRowCount();
+      const headerCols = table.headerColumnCount();
+      const footerRows = table.footerRowCount();
+      const totalRows = table.rowCount();
+      const totalCols = table.columnCount();
+      const frozen = table.headerRowsFrozen();
+      const tblName = table.name();
+
+      return {
+        totalRows,
+        totalColumns: totalCols,
+        headerRowCount: headerRows,
+        headerColumnCount: headerCols,
+        footerRowCount: footerRows,
+        dataStartRow: headerRows + 1,
+        dataEndRow: totalRows - footerRows,
+        headersFrozen: frozen,
+        tableName: tblName
+      };
+    }, { documentName, sheetName, tableName });
+
+    return structure as TableStructure;
+  } catch (error) {
+    throw new Error(`Failed to get table structure: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Read data from a sheet/table
  */
 async function getSheetData(
@@ -227,11 +368,22 @@ async function getSheetData(
   includeFormulas: boolean = false
 ): Promise<TableData> {
   try {
+    // Parse range outside JXA to avoid scope issues
+    let parsedRange: { startRow: number; startCol: number; endRow: number; endCol: number } | null = null;
+
+    if (range) {
+      try {
+        parsedRange = parseRange(range);
+      } catch (error) {
+        throw new Error(`Invalid range: ${range}`);
+      }
+    }
+
     const data = await run((args: {
       documentName: string;
       sheetName: string;
       tableName?: string;
-      range?: string;
+      parsedRange: { startRow: number; startCol: number; endRow: number; endCol: number } | null;
       includeFormulas: boolean;
     }) => {
       const Numbers = Application('Numbers');
@@ -270,28 +422,11 @@ async function getSheetData(
       let endRow = table.rowCount();
       let endCol = table.columnCount();
 
-      if (args.range) {
-        const parts = args.range.split(':');
-        if (parts.length === 2) {
-          const startMatch = parts[0].match(/^([A-Z]+)(\d+)$/);
-          const endMatch = parts[1].match(/^([A-Z]+)(\d+)$/);
-
-          if (startMatch && endMatch) {
-            // Convert column letters to numbers
-            const colToNum = (col: string) => {
-              let num = 0;
-              for (let i = 0; i < col.length; i++) {
-                num = num * 26 + (col.charCodeAt(i) - 64);
-              }
-              return num;
-            };
-
-            startCol = colToNum(startMatch[1]);
-            startRow = parseInt(startMatch[2]);
-            endCol = colToNum(endMatch[1]);
-            endRow = parseInt(endMatch[2]);
-          }
-        }
+      if (args.parsedRange) {
+        startRow = args.parsedRange.startRow;
+        startCol = args.parsedRange.startCol;
+        endRow = args.parsedRange.endRow;
+        endCol = args.parsedRange.endCol;
       }
 
       // Read data
@@ -324,7 +459,7 @@ async function getSheetData(
         rowCount: endRow - startRow + 1,
         columnCount: endCol - startCol + 1
       };
-    }, { documentName, sheetName, tableName, range, includeFormulas });
+    }, { documentName, sheetName, tableName, parsedRange, includeFormulas });
 
     return data as TableData;
   } catch (error) {
@@ -343,63 +478,32 @@ async function updateCell(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      cellReference: string;
-      value: string | number;
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Use AppleScript for reliable cell updates
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
-      }
+    // Escape quotes in string values
+    const escapedValue = typeof value === 'string'
+      ? value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      : value;
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set value of cell "${cellReference}" to ${typeof value === 'string' ? `"${escapedValue}"` : value}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
+    await runAppleScript(script);
 
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
-
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
-
-      const table = tables[0];
-
-      // Parse cell reference
-      const match = args.cellReference.match(/^([A-Z]+)(\d+)$/);
-      if (!match) {
-        throw new Error(`Invalid cell reference: ${args.cellReference}`);
-      }
-
-      const colStr = match[1];
-      const rowNum = parseInt(match[2]);
-
-      let colNum = 0;
-      for (let i = 0; i < colStr.length; i++) {
-        colNum = colNum * 26 + (colStr.charCodeAt(i) - 64);
-      }
-
-      // Set cell value (Numbers uses 0-based indexing internally)
-      const cell = table.cells.at(colNum - 1).at(rowNum - 1);
-      cell.value = args.value;
-
-      return {
-        success: true,
-        message: `Updated cell ${args.cellReference} to "${args.value}"`
-      };
-    }, { documentName, sheetName, cellReference, value, tableName });
-
-    return result as { success: boolean; message: string };
+    return {
+      success: true,
+      message: `Updated cell ${cellReference} to "${value}"`
+    };
   } catch (error) {
     return {
       success: false,
@@ -415,64 +519,59 @@ async function appendRow(
   documentName: string,
   sheetName: string,
   values: (string | number)[],
-  tableName?: string
+  tableName?: string,
+  insertPosition: 'after-headers' | 'after-data' | 'at-end' = 'after-data'
 ): Promise<{ success: boolean; rowNumber: number; message: string }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      values: (string | number)[];
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Get table structure to determine where to insert
+    const structure = await getTableStructure(documentName, sheetName, tableName);
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
-      }
+    let insertAfterRow: number;
+    switch (insertPosition) {
+      case 'after-headers':
+        insertAfterRow = structure.headerRowCount;
+        break;
+      case 'after-data':
+        insertAfterRow = structure.dataEndRow;
+        break;
+      case 'at-end':
+        insertAfterRow = structure.totalRows;
+        break;
+    }
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    // Use AppleScript for reliable row manipulation
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
+    // Build cell assignments
+    const cellAssignments = values.map((val, idx) => {
+      const escapedValue = typeof val === 'string'
+        ? val.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        : val;
+      const valueStr = typeof val === 'string' ? `"${escapedValue}"` : val;
+      return `        set value of cell ${idx + 1} of newRow to ${valueStr}`;
+    }).join('\n');
 
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set newRow to make new row at after row ${insertAfterRow}
+        ${cellAssignments}
+        return ${insertAfterRow + 1}
+      end tell
+    end tell
+  end tell
+end tell`;
 
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
+    const result = await runAppleScript(script);
+    const rowNumber = parseInt(result, 10);
 
-      const table = tables[0];
-      const currentRowCount = table.rowCount();
-
-      // Add a new row
-      table.rows.push(table.make({ new: 'row' }));
-
-      const newRowIndex = currentRowCount + 1;
-
-      // Populate the new row with values
-      for (let i = 0; i < args.values.length; i++) {
-        try {
-          const cell = table.cells.at(i).at(currentRowCount);
-          cell.value = args.values[i];
-        } catch (e) {
-          // Cell might not exist, skip
-        }
-      }
-
-      return {
-        success: true,
-        rowNumber: newRowIndex,
-        message: `Added row ${newRowIndex} with ${args.values.length} value(s)`
-      };
-    }, { documentName, sheetName, values, tableName });
-
-    return result as { success: boolean; rowNumber: number; message: string };
+    return {
+      success: true,
+      rowNumber: rowNumber,
+      message: `Added row ${rowNumber} with ${values.length} value(s) (insertPosition: ${insertPosition})`
+    };
   } catch (error) {
     return {
       success: false,
@@ -493,76 +592,53 @@ async function updateRange(
   tableName?: string
 ): Promise<{ success: boolean; message: string; cellsUpdated: number }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      startCell: string;
-      values: (string | number)[][];
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Parse start cell to get row and column
+    const { row: startRow, col: startCol } = parseA1Notation(startCell);
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
+    // Use AppleScript for reliable range updates
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    // Build cell assignments
+    let cellsUpdated = 0;
+    const cellAssignments: string[] = [];
+
+    for (let r = 0; r < values.length; r++) {
+      const rowValues = values[r];
+      for (let c = 0; c < rowValues.length; c++) {
+        const value = rowValues[c];
+        const targetRow = startRow + r;
+        const targetCol = startCol + c;
+        const cellRef = `${numberToColumn(targetCol)}${targetRow}`;
+
+        const escapedValue = typeof value === 'string'
+          ? value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          : value;
+        const valueStr = typeof value === 'string' ? `"${escapedValue}"` : value;
+
+        cellAssignments.push(`        set value of cell "${cellRef}" to ${valueStr}`);
+        cellsUpdated++;
       }
+    }
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+${cellAssignments.join('\n')}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
+    await runAppleScript(script);
 
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
-
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
-
-      const table = tables[0];
-
-      // Parse start cell
-      const match = args.startCell.match(/^([A-Z]+)(\d+)$/);
-      if (!match) {
-        throw new Error(`Invalid cell reference: ${args.startCell}`);
-      }
-
-      const colStr = match[1];
-      const rowNum = parseInt(match[2]);
-
-      let startColNum = 0;
-      for (let i = 0; i < colStr.length; i++) {
-        startColNum = startColNum * 26 + (colStr.charCodeAt(i) - 64);
-      }
-
-      let cellsUpdated = 0;
-
-      // Update cells
-      for (let r = 0; r < args.values.length; r++) {
-        const row = args.values[r];
-        for (let c = 0; c < row.length; c++) {
-          try {
-            const cell = table.cells.at(startColNum + c - 1).at(rowNum + r - 1);
-            cell.value = row[c];
-            cellsUpdated++;
-          } catch (e) {
-            // Cell might not exist, skip
-          }
-        }
-      }
-
-      return {
-        success: true,
-        message: `Updated ${cellsUpdated} cell(s) starting from ${args.startCell}`,
-        cellsUpdated: cellsUpdated
-      };
-    }, { documentName, sheetName, startCell, values, tableName });
-
-    return result as { success: boolean; message: string; cellsUpdated: number };
+    return {
+      success: true,
+      message: `Updated ${cellsUpdated} cell(s) starting from ${startCell}`,
+      cellsUpdated: cellsUpdated
+    };
   } catch (error) {
     return {
       success: false,
@@ -705,56 +781,31 @@ async function insertRows(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      afterRow: number;
-      count: number;
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Use AppleScript for reliable row insertion
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
-      }
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        repeat ${count} times
+          ${afterRow === 0
+            ? 'make new row at beginning of rows'
+            : `make new row at after row ${afterRow}`}
+        end repeat
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    await runAppleScript(script);
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
-
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
-
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
-
-      const table = tables[0];
-
-      // Insert rows
-      for (let i = 0; i < args.count; i++) {
-        if (args.afterRow === 0) {
-          // Insert at beginning
-          table.rows.push(table.make({ new: 'row', at: table.rows.at(0) }));
-        } else {
-          // Insert after specified row
-          table.rows.push(table.make({ new: 'row', at: table.rows.at(args.afterRow + i) }));
-        }
-      }
-
-      return {
-        success: true,
-        message: `Inserted ${args.count} row(s) after row ${args.afterRow}`
-      };
-    }, { documentName, sheetName, afterRow, count, tableName });
-
-    return result as { success: boolean; message: string };
+    return {
+      success: true,
+      message: `Inserted ${count} row(s) after row ${afterRow}`
+    };
   } catch (error) {
     return {
       success: false,
@@ -774,55 +825,33 @@ async function deleteRows(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      startRow: number;
-      count: number;
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Use AppleScript for reliable row deletion
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
-      }
+    // Delete in reverse order to maintain indices
+    const deleteStatements = [];
+    for (let i = count - 1; i >= 0; i--) {
+      deleteStatements.push(`        delete row ${startRow + i}`);
+    }
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+${deleteStatements.join('\n')}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
+    await runAppleScript(script);
 
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
-
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
-
-      const table = tables[0];
-
-      // Delete rows (delete in reverse order to maintain indices)
-      for (let i = args.count - 1; i >= 0; i--) {
-        const rowIndex = args.startRow + i - 1;
-        try {
-          table.rows.at(rowIndex).delete();
-        } catch (e) {
-          throw new Error(`Could not delete row ${args.startRow + i}`);
-        }
-      }
-
-      return {
-        success: true,
-        message: `Deleted ${args.count} row(s) starting from row ${args.startRow}`
-      };
-    }, { documentName, sheetName, startRow, count, tableName });
-
-    return result as { success: boolean; message: string };
+    return {
+      success: true,
+      message: `Deleted ${count} row(s) starting from row ${startRow}`
+    };
   } catch (error) {
     return {
       success: false,
@@ -913,66 +942,33 @@ async function setFormula(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const result = await run((args: {
-      documentName: string;
-      sheetName: string;
-      cellReference: string;
-      formula: string;
-      tableName?: string;
-    }) => {
-      const Numbers = Application('Numbers');
-      const docs = Numbers.documents.whose({ name: args.documentName })();
+    // Use AppleScript for reliable formula setting
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
 
-      if (docs.length === 0) {
-        throw new Error(`Document "${args.documentName}" not found`);
-      }
+    // Ensure formula starts with =
+    const finalFormula = formula.startsWith('=') ? formula : `=${formula}`;
 
-      const doc = docs[0];
-      const sheets = doc.sheets.whose({ name: args.sheetName })();
+    // Escape quotes in formula
+    const escapedFormula = finalFormula.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-      if (sheets.length === 0) {
-        throw new Error(`Sheet "${args.sheetName}" not found`);
-      }
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set formula of cell "${cellReference}" to "${escapedFormula}"
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
 
-      const sheet = sheets[0];
-      const tables = args.tableName
-        ? sheet.tables.whose({ name: args.tableName })()
-        : sheet.tables();
+    await runAppleScript(script);
 
-      if (tables.length === 0) {
-        throw new Error('No tables found');
-      }
-
-      const table = tables[0];
-
-      // Parse cell reference
-      const match = args.cellReference.match(/^([A-Z]+)(\d+)$/);
-      if (!match) {
-        throw new Error(`Invalid cell reference: ${args.cellReference}`);
-      }
-
-      const colStr = match[1];
-      const rowNum = parseInt(match[2]);
-
-      let colNum = 0;
-      for (let i = 0; i < colStr.length; i++) {
-        colNum = colNum * 26 + (colStr.charCodeAt(i) - 64);
-      }
-
-      // Ensure formula starts with =
-      const finalFormula = args.formula.startsWith('=') ? args.formula : `=${args.formula}`;
-
-      // Set cell formula
-      const cell = table.cells.at(colNum - 1).at(rowNum - 1);
-      cell.formula = finalFormula;
-
-      return {
-        success: true,
-        message: `Set formula in cell ${args.cellReference} to "${finalFormula}"`
-      };
-    }, { documentName, sheetName, cellReference, formula, tableName });
-
-    return result as { success: boolean; message: string };
+    return {
+      success: true,
+      message: `Set formula in cell ${cellReference} to "${finalFormula}"`
+    };
   } catch (error) {
     return {
       success: false,
@@ -981,9 +977,290 @@ async function setFormula(
   }
 }
 
+/**
+ * Set number format for a cell
+ */
+async function setNumberFormat(
+  documentName: string,
+  sheetName: string,
+  cellReference: string,
+  format: string,
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set format of cell "${cellReference}" to ${format}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Set number format of cell ${cellReference} to "${format}"`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to set number format: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Format a cell with colors, fonts, and alignment
+ */
+async function formatCell(
+  documentName: string,
+  sheetName: string,
+  cellReference: string,
+  options: {
+    backgroundColor?: string;
+    textColor?: string;
+    fontName?: string;
+    fontSize?: number;
+    alignment?: string;
+    verticalAlignment?: string;
+    textWrap?: boolean;
+  },
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    // Build formatting commands
+    const commands: string[] = [];
+
+    if (options.backgroundColor) {
+      const rgb = hexToAppleScriptRGB(options.backgroundColor);
+      commands.push(`        set background color of cell "${cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+    }
+
+    if (options.textColor) {
+      const rgb = hexToAppleScriptRGB(options.textColor);
+      commands.push(`        set text color of cell "${cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+    }
+
+    if (options.fontName) {
+      commands.push(`        set font name of cell "${cellReference}" to "${options.fontName}"`);
+    }
+
+    if (options.fontSize) {
+      commands.push(`        set font size of cell "${cellReference}" to ${options.fontSize}`);
+    }
+
+    if (options.alignment) {
+      commands.push(`        set alignment of cell "${cellReference}" to ${options.alignment}`);
+    }
+
+    if (options.verticalAlignment) {
+      commands.push(`        set vertical alignment of cell "${cellReference}" to ${options.verticalAlignment}`);
+    }
+
+    if (options.textWrap !== undefined) {
+      commands.push(`        set text wrap of cell "${cellReference}" to ${options.textWrap}`);
+    }
+
+    if (commands.length === 0) {
+      return {
+        success: false,
+        message: 'No formatting options provided'
+      };
+    }
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+${commands.join('\n')}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Applied formatting to cell ${cellReference}`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to format cell: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Set column width
+ */
+async function setColumnWidth(
+  documentName: string,
+  sheetName: string,
+  column: string,
+  width: number,
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set width of column "${column}" to ${width}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Set column ${column} width to ${width} points`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to set column width: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Set row height
+ */
+async function setRowHeight(
+  documentName: string,
+  sheetName: string,
+  row: number,
+  height: number,
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        set height of row ${row} to ${height}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Set row ${row} height to ${height} points`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to set row height: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Merge cells in a range
+ */
+async function mergeCells(
+  documentName: string,
+  sheetName: string,
+  range: string,
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        merge range "${range}"
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Merged cells in range ${range}`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to merge cells: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Unmerge cells in a range
+ */
+async function unmergeCells(
+  documentName: string,
+  sheetName: string,
+  range: string,
+  tableName?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+        unmerge range "${range}"
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Unmerged cells in range ${range}`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to unmerge cells: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
 export default {
   listDocuments,
   getDocumentInfo,
+  getTableStructure,
   getSheetData,
   updateCell,
   appendRow,
@@ -992,5 +1269,11 @@ export default {
   insertRows,
   deleteRows,
   getFormula,
-  setFormula
+  setFormula,
+  formatCell,
+  setNumberFormat,
+  setColumnWidth,
+  setRowHeight,
+  mergeCells,
+  unmergeCells
 };

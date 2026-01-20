@@ -1,25 +1,47 @@
-# Apple MCP Tools v2.0
+<div align="center">
+
+# 🍎 Apple MCP Server
 
 [![smithery badge](https://smithery.ai/badge/@Dhravya/apple-mcp)](https://smithery.ai/server/@Dhravya/apple-mcp)
+[![npm version](https://badge.fury.io/js/@dhravya%2Fapple-mcp.svg)](https://www.npmjs.com/package/@dhravya/apple-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive MCP server providing Claude and other AI assistants access to native Apple applications on macOS.
+**Control your entire macOS ecosystem through Claude and other AI assistants**
+
+A powerful Model Context Protocol (MCP) server that provides seamless integration with native Apple applications including Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, and Photos.
 
 <a href="https://glama.ai/mcp/servers/gq2qg6kxtu">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/gq2qg6kxtu/badge" alt="Apple Server MCP server" />
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/gq2qg6kxtu/badge" alt="Apple MCP Server" />
 </a>
 
-## What's New in v2.0
+[Features](#-features) • [Installation](#-quick-install) • [Examples](#-example-usage) • [Contributing](#-contributing)
+
+</div>
+
+---
+
+## ✨ Highlights
+
+- 🗺️ **AI-Powered Route Analysis** - Get turn-by-turn directions with distance, duration, and alternative routes using native MapKit
+- 🌐 **Safari Integration** - Access bookmarks, reading list, and open tabs
+- 📸 **Photos Integration** - Search photos with ML-based recognition
+- 💬 **iMessage Automation** - Send messages and read conversations
+- 📧 **Mail Management** - Read, search, and send emails
+- 🔒 **Privacy-First** - All processing happens locally on your Mac
+- 🧩 **9 Native Apps** - Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, Photos
+
+## 🆕 What's New in v2.0
 
 - **Modular Architecture**: Completely refactored for better maintainability
 - **Safari Integration**: Access bookmarks, reading list, and open tabs
 - **Photos Integration**: Search photos, list albums, get recent photos
-- **AI-Powered Route Analysis** ✨: Get detailed route information (distance, duration, turn-by-turn directions, alternative routes) using native MapKit framework
+- **AI-Powered Route Analysis**: Get detailed route information (distance, duration, turn-by-turn directions, alternative routes) using native MapKit framework
 - **Updated MCP SDK**: Now using @modelcontextprotocol/sdk v1.25.x
 - **Zod Validation**: Type-safe argument validation with better error messages
-- **Testing**: Added Vitest test suite
+- **Testing**: Added comprehensive Vitest test suite
 - **Removed**: Web search tool (Claude has built-in web search)
 
-## Quick Install
+## 🚀 Quick Install
 
 ### Via Smithery (Recommended)
 
@@ -77,67 +99,96 @@ npm run build:swift-helpers
 }
 ```
 
-## Features
+## 📋 Features
 
-### Contacts
+<details>
+<summary>👥 <b>Contacts</b></summary>
+
 - Search contacts by name
 - Get all contacts with phone numbers
 - Find contact names by phone number
+</details>
 
-### Notes
+<details>
+<summary>📝 <b>Notes</b></summary>
+
 - List all notes
 - Search notes by title or content
 - Create new notes (saves to "Claude" folder by default)
+</details>
 
-### Messages
-- Send iMessages
+<details>
+<summary>💬 <b>Messages (iMessage)</b></summary>
+
+- Send iMessages to contacts
 - Read message history from specific contacts
 - Schedule messages for future delivery
 - Get unread messages
+</details>
 
-### Mail
+<details>
+<summary>📧 <b>Mail</b></summary>
+
 - Read unread emails
 - Search emails across accounts and mailboxes
 - Send emails with to/cc/bcc support
 - List mailboxes and accounts
+</details>
 
-### Reminders
+<details>
+<summary>✅ <b>Reminders</b></summary>
+
 - List all reminder lists
 - Search reminders by text
 - Create reminders with due dates and notes
 - Get reminders by list ID
+</details>
 
-### Calendar
+<details>
+<summary>📅 <b>Calendar</b></summary>
+
 - Search events by text with date range filtering
 - List upcoming events
 - Create calendar events with full details
 - Open specific events in Calendar app
+</details>
 
-### Maps
+<details open>
+<summary>🗺️ <b>Maps (with AI-Powered Route Analysis)</b></summary>
+
 - Search locations
 - Save locations to favorites
 - Get directions with transport type options
 - **Analyze routes** with detailed information:
-  - Distance and duration
-  - Turn-by-turn directions
-  - Alternative routes
+  - Distance and duration (in miles and minutes)
+  - Turn-by-turn directions with per-step distances
+  - Alternative routes comparison
   - Support for driving, walking, and transit
+  - Polyline coordinates for visualization
+  - 100% native MapKit - no external APIs
 - Drop pins, create and manage guides
+</details>
 
-### Safari (New in v2.0)
+<details>
+<summary>🌐 <b>Safari</b></summary>
+
 - List and search bookmarks
 - Access reading list items
-- Get current tab info
+- Get current tab information
 - Get all open tabs
 - Add URLs to reading list
+</details>
 
-### Photos (New in v2.0)
+<details>
+<summary>📸 <b>Photos</b></summary>
+
 - Search photos using ML-based recognition
 - List all albums
 - Get recent photos
 - Get photos from specific albums
+</details>
 
-## Example Usage
+## 💡 Example Usage
 
 ```
 Send a message to John saying "See you tomorrow!"
@@ -167,7 +218,7 @@ Show me my Safari reading list
 Analyze the route from San Francisco to San Jose and suggest the fastest way to get there
 ```
 
-## Workflow Examples
+## 🔗 Workflow Examples
 
 Chain multiple tools together:
 
@@ -180,7 +231,7 @@ and send them a message saying "Great meeting you!"
 Check my unread emails, find any meeting invites, and add them to my calendar
 ```
 
-## Local Development
+## 🛠️ Local Development
 
 ```bash
 git clone https://github.com/dhravya/apple-mcp.git
@@ -222,27 +273,125 @@ src/
 └── utils/            # Apple app integrations (JXA/AppleScript)
 ```
 
-## Requirements
+## ⚙️ Requirements
 
 - macOS (tested on Sequoia/Tahoe)
 - Bun or Node.js 18+
 - Xcode Command Line Tools (for route analysis feature): `xcode-select --install`
 - Appropriate permissions for each Apple app
 
-## Permissions
+## 🔒 Privacy & Permissions
 
-Grant the following permissions in System Settings > Privacy & Security:
+**All data processing happens locally on your Mac.** This server does not send any data to external services.
 
-- **Contacts**: Allow access to Contacts
-- **Calendar**: Allow access to Calendar
-- **Reminders**: Allow access to Reminders
+Grant the following permissions in **System Settings > Privacy & Security**:
+
+- **Contacts**: Allow access to Contacts app
+- **Calendar**: Allow access to Calendar app
+- **Reminders**: Allow access to Reminders app
 - **Full Disk Access**: Required for Messages database access
-- **Automation**: Allow control of Mail, Safari, Photos, Maps
+- **Automation**: Allow control of Mail, Safari, Photos, Maps, Notes
 
-## License
+When you first use each tool, macOS will prompt you to grant the necessary permissions.
 
-MIT
+## 🐛 Troubleshooting
 
-## Contributing
+<details>
+<summary><b>Route analysis not working</b></summary>
 
-Contributions welcome! Please read the CLAUDE.md for development guidelines.
+The route analysis feature requires the Swift MapKit helper to be built:
+
+1. Install Xcode Command Line Tools: `xcode-select --install`
+2. Navigate to the package directory
+3. Run: `npm run build:swift-helpers`
+4. Run: `./check-setup.sh` to verify
+5. Restart Claude Desktop
+
+Note: Basic Maps features (search, directions UI, guides) work without the Swift helper.
+</details>
+
+<details>
+<summary><b>"Cannot access [App]" errors</b></summary>
+
+Check **System Settings > Privacy & Security**:
+- Grant permissions for the specific app
+- For Messages, ensure "Full Disk Access" is enabled
+- For Mail/Safari/Photos/Maps, ensure "Automation" is enabled
+</details>
+
+<details>
+<summary><b>Installation fails with bunx</b></summary>
+
+Try using `npx` instead:
+```json
+{
+  "mcpServers": {
+    "apple-mcp": {
+      "command": "npx",
+      "args": ["-y", "@dhravya/apple-mcp@latest"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Swift build errors</b></summary>
+
+Make sure you have Xcode Command Line Tools installed:
+```bash
+xcode-select --install
+# Verify installation
+swift --version
+```
+</details>
+
+## 🤝 Contributing
+
+Contributions are welcome! This is an open-source project and we'd love your help to make it better.
+
+### How to Contribute
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and add tests if applicable
+4. **Run tests**: `npm test`
+5. **Commit your changes**: `git commit -m 'Add amazing feature'`
+6. **Push to the branch**: `git push origin feature/amazing-feature`
+7. **Open a Pull Request**
+
+### Development Guidelines
+
+- Read [CLAUDE.md](./CLAUDE.md) for codebase architecture and patterns
+- Follow the existing code style
+- Add tests for new features
+- Update documentation as needed
+
+### Ideas for Contributions
+
+- 🐛 Bug fixes
+- ✨ New Apple app integrations
+- 📝 Improved Notes formatting support
+- 🎨 Better error messages
+- 📚 Documentation improvements
+- 🧪 More test coverage
+
+## 📜 License
+
+[MIT](./LICENSE) © [Dhravya Shah](https://github.com/dhravya)
+
+## 🙏 Acknowledgments
+
+- Built with the [Model Context Protocol](https://modelcontextprotocol.io/)
+- Powered by [Anthropic's Claude](https://www.anthropic.com/claude)
+- Thanks to all [contributors](https://github.com/dhravya/apple-mcp/graphs/contributors)
+
+---
+
+<div align="center">
+
+**[⭐ Star this repo](https://github.com/dhravya/apple-mcp)** if you find it useful!
+
+Made with ❤️ for the macOS + AI community
+
+</div>

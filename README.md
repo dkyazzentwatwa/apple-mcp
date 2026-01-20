@@ -13,6 +13,7 @@ A comprehensive MCP server providing Claude and other AI assistants access to na
 - **Modular Architecture**: Completely refactored for better maintainability
 - **Safari Integration**: Access bookmarks, reading list, and open tabs
 - **Photos Integration**: Search photos, list albums, get recent photos
+- **AI-Powered Route Analysis** ✨: Get detailed route information (distance, duration, turn-by-turn directions, alternative routes) using native MapKit framework
 - **Updated MCP SDK**: Now using @modelcontextprotocol/sdk v1.25.x
 - **Zod Validation**: Type-safe argument validation with better error messages
 - **Testing**: Added Vitest test suite
@@ -30,6 +31,11 @@ npx -y @smithery/cli@latest install @Dhravya/apple-mcp --client claude
 npx -y @smithery/cli@latest install @Dhravya/apple-mcp --client cursor
 ```
 
+**First-Time Setup** (for route analysis features):
+1. Install Xcode Command Line Tools: `xcode-select --install`
+2. The Swift helper builds automatically during installation
+3. Restart Claude Desktop
+
 ### Manual Configuration
 
 Add to your `claude_desktop_config.json`:
@@ -40,6 +46,32 @@ Add to your `claude_desktop_config.json`:
     "apple-mcp": {
       "command": "bunx",
       "args": ["@dhravya/apple-mcp@latest"]
+    }
+  }
+}
+```
+
+**⚠️ Important**: When using `bunx`, route analysis requires a one-time setup:
+
+```bash
+# Navigate to the package location
+cd ~/Library/Application\ Support/Claude/node_modules/@dhravya/apple-mcp
+# Or wherever bunx caches packages
+
+# Install dependencies and build Swift helper
+npm install
+npm run build:swift-helpers
+
+# Restart Claude Desktop
+```
+
+**Alternative**: Use npm install instead:
+```json
+{
+  "mcpServers": {
+    "apple-mcp": {
+      "command": "npx",
+      "args": ["-y", "@dhravya/apple-mcp@latest"]
     }
   }
 }
@@ -85,6 +117,11 @@ Add to your `claude_desktop_config.json`:
 - Search locations
 - Save locations to favorites
 - Get directions with transport type options
+- **Analyze routes** with detailed information:
+  - Distance and duration
+  - Turn-by-turn directions
+  - Alternative routes
+  - Support for driving, walking, and transit
 - Drop pins, create and manage guides
 
 ### Safari (New in v2.0)
@@ -126,6 +163,10 @@ Search my photos for "beach vacation"
 Show me my Safari reading list
 ```
 
+```
+Analyze the route from San Francisco to San Jose and suggest the fastest way to get there
+```
+
 ## Workflow Examples
 
 Chain multiple tools together:
@@ -145,8 +186,23 @@ Check my unread emails, find any meeting invites, and add them to my calendar
 git clone https://github.com/dhravya/apple-mcp.git
 cd apple-mcp
 npm install
+# Build Swift helpers for route analysis (requires Xcode Command Line Tools)
+npm run build:swift-helpers
 npm run dev
 ```
+
+### Verify Setup
+
+Run the setup checker to ensure all features are working:
+
+```bash
+./check-setup.sh
+```
+
+This will verify:
+- Swift installation
+- MapKit helper build status
+- Route analysis functionality
 
 ### Running Tests
 
@@ -170,6 +226,7 @@ src/
 
 - macOS (tested on Sequoia/Tahoe)
 - Bun or Node.js 18+
+- Xcode Command Line Tools (for route analysis feature): `xcode-select --install`
 - Appropriate permissions for each Apple app
 
 ## Permissions

@@ -1,4 +1,12 @@
 import { run } from '@jxa/run';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const execAsync = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Type definitions
 interface MapLocation {
@@ -51,6 +59,35 @@ interface AddToGuideResult {
     message: string;
     guideName?: string;
     locationName?: string;
+}
+
+interface RouteStep {
+    instructions: string;
+    distance: number;
+    notice?: string;
+}
+
+interface AlternativeRoute {
+    distance: number;
+    expectedTravelTime: number;
+    name?: string;
+}
+
+interface RouteAnalysisResult {
+    success: boolean;
+    message?: string;
+    error?: string;
+    route?: {
+        distance: string;
+        duration: string;
+        distanceMeters: number;
+        durationSeconds: number;
+        startAddress: string;
+        endAddress: string;
+        steps: RouteStep[];
+        polyline?: string;
+        alternatives?: AlternativeRoute[];
+    };
 }
 
 /**
@@ -572,6 +609,102 @@ async function createGuide(guideName: string): Promise<AddToGuideResult> {
     }
 }
 
+/**
+ * Analyze a route using MapKit (Swift helper)
+ * Returns detailed route information for AI analysis
+ * @param fromAddress Starting address
+ * @param toAddress Destination address
+ * @param transportType Type of transport (driving, walking, transit)
+ * @param includeAlternatives Whether to include alternative routes
+ */
+async function analyzeRoute(
+    fromAddress: string,
+    toAddress: string,
+    transportType: 'driving' | 'walking' | 'transit' = 'driving',
+    includeAlternatives: boolean = false
+): Promise<RouteAnalysisResult> {
+    try {
+        // Check if Swift helper exists
+        const helperPath = path.join(__dirname, '../../helpers/mapkit-directions/.build/release/mapkit-directions');
+
+        // Prepare input for Swift helper
+        const input = JSON.stringify({
+            fromAddress,
+            toAddress,
+            transportType,
+            includeAlternatives
+        });
+
+        // Execute Swift helper
+        console.error(`analyzeRoute - Calculating route from "${fromAddress}" to "${toAddress}" via ${transportType}`);
+
+        const { stdout, stderr } = await execAsync(`echo '${input.replace(/'/g, "'\\''")}' | "${helperPath}"`, {
+            timeout: 30000 // 30 second timeout
+        });
+
+        if (stderr) {
+            console.error(`Swift helper stderr: ${stderr}`);
+        }
+
+        // Parse response
+        const response = JSON.parse(stdout);
+
+        if (!response.success) {
+            return {
+                success: false,
+                error: response.error || 'Unknown error from route calculation',
+                message: `Failed to calculate route: ${response.error || 'Unknown error'}`
+            };
+        }
+
+        // Convert to miles and minutes for display
+        const distanceMiles = (response.distance / 1609.34).toFixed(1);
+        const durationMinutes = Math.round(response.expectedTravelTime / 60);
+
+        return {
+            success: true,
+            message: `Route calculated: ${distanceMiles} miles, approximately ${durationMinutes} minutes`,
+            route: {
+                distance: `${distanceMiles} miles`,
+                duration: `${durationMinutes} min`,
+                distanceMeters: response.distance,
+                durationSeconds: response.expectedTravelTime,
+                startAddress: fromAddress,
+                endAddress: toAddress,
+                steps: response.steps || [],
+                polyline: response.polyline,
+                alternatives: response.alternativeRoutes
+            }
+        };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check for common errors
+        if (errorMessage.includes('ENOENT') || errorMessage.includes('No such file')) {
+            return {
+                success: false,
+                error: 'Route analysis not available - Swift helper not built',
+                message: `Route analysis requires the MapKit helper to be built.
+
+Setup steps:
+1. Install Xcode Command Line Tools: xcode-select --install
+2. Navigate to the apple-mcp package directory
+3. Run: npm run build:swift-helpers
+4. Restart Claude Desktop
+
+Note: Basic Maps features (search, directions, guides) still work without this.`
+            };
+        }
+
+        return {
+            success: false,
+            error: errorMessage,
+            message: `Error analyzing route: ${errorMessage}`
+        };
+    }
+}
+
 const maps = {
     searchLocations,
     saveLocation,
@@ -579,7 +712,8 @@ const maps = {
     dropPin,
     listGuides,
     addToGuide,
-    createGuide
+    createGuide,
+    analyzeRoute
 };
 
 export default maps;

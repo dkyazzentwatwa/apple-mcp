@@ -40,6 +40,14 @@ const AddToGuideSchema = z.object({
   guideName: z.string().min(1, 'guideName is required for addToGuide operation').describe('Name of the guide to add to')
 });
 
+const AnalyzeRouteSchema = z.object({
+  operation: z.literal('analyzeRoute'),
+  fromAddress: z.string().min(1, 'fromAddress is required for analyzeRoute operation').describe('Starting address for route analysis'),
+  toAddress: z.string().min(1, 'toAddress is required for analyzeRoute operation').describe('Destination address for route analysis'),
+  transportType: z.enum(['driving', 'walking', 'transit']).optional().describe('Type of transport to use (default: driving)'),
+  includeAlternatives: z.boolean().optional().describe('Whether to include alternative routes (default: false)')
+});
+
 export const MapsArgsSchema = z.discriminatedUnion('operation', [
   SearchLocationsSchema,
   SaveLocationSchema,
@@ -47,7 +55,8 @@ export const MapsArgsSchema = z.discriminatedUnion('operation', [
   PinLocationSchema,
   ListGuidesSchema,
   CreateGuideSchema,
-  AddToGuideSchema
+  AddToGuideSchema,
+  AnalyzeRouteSchema
 ]);
 
 export type MapsArgs = z.infer<typeof MapsArgsSchema>;

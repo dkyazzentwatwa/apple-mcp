@@ -31,7 +31,10 @@
     "dev": "bun run src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "build:swift-helpers": "cd helpers/mapkit-directions && swift build -c release",
+    "postinstall": "npm run build:swift-helpers || echo '\n⚠️  Swift helper build failed. Route analysis features will not work.\n\n   To fix:\n   1. Install Xcode Command Line Tools: xcode-select --install\n   2. Build helpers: npm run build:swift-helpers\n   3. Restart Claude Desktop\n\n   Or use the Maps tool without route analysis (search, directions, guides still work).\n'",
+    "setup": "echo '🔧 Setting up Apple MCP...' && npm run build:swift-helpers && echo '✅ Setup complete! Route analysis is ready.'"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

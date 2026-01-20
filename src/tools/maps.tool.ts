@@ -5,7 +5,7 @@ import mapsUtil from '../utils/maps.js';
 
 export const MAPS_TOOL: Tool = {
   name: 'maps',
-  description: 'Search locations, manage guides, save favorites, and get directions using Apple Maps',
+  description: 'Search locations, manage guides, save favorites, get directions, and analyze routes with detailed information (distance, duration, turn-by-turn steps) using Apple Maps and MapKit',
   inputSchema: createToolSchema(MapsArgsSchema)
 };
 
@@ -104,6 +104,61 @@ export async function handleMaps(args: unknown) {
             text: result.message
           }],
           isError: !result.success
+        };
+      }
+
+      case 'analyzeRoute': {
+        const result = await mapsUtil.analyzeRoute(
+          parsed.fromAddress,
+          parsed.toAddress,
+          parsed.transportType || 'driving',
+          parsed.includeAlternatives || false
+        );
+
+        if (!result.success || !result.route) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: result.error || result.message || 'Failed to analyze route'
+            }],
+            isError: true
+          };
+        }
+
+        // Format route information for display
+        const route = result.route;
+        let routeText = `Route from ${route.startAddress} to ${route.endAddress}\n\n`;
+        routeText += `Distance: ${route.distance}\n`;
+        routeText += `Duration: ${route.duration}\n`;
+        routeText += `Transport: ${parsed.transportType || 'driving'}\n\n`;
+
+        if (route.steps && route.steps.length > 0) {
+          routeText += `Turn-by-turn directions:\n`;
+          route.steps.forEach((step, idx) => {
+            const distanceMiles = (step.distance / 1609.34).toFixed(1);
+            routeText += `${idx + 1}. ${step.instructions} (${distanceMiles} mi)`;
+            if (step.notice) {
+              routeText += ` - ${step.notice}`;
+            }
+            routeText += '\n';
+          });
+        }
+
+        if (route.alternatives && route.alternatives.length > 0) {
+          routeText += `\nAlternative routes:\n`;
+          route.alternatives.forEach((alt, idx) => {
+            const altDistanceMiles = (alt.distance / 1609.34).toFixed(1);
+            const altDurationMin = Math.round(alt.expectedTravelTime / 60);
+            routeText += `${idx + 1}. ${alt.name || 'Alternative route'}: ${altDistanceMiles} mi, ${altDurationMin} min\n`;
+          });
+        }
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: routeText
+          }],
+          isError: false
         };
       }
 

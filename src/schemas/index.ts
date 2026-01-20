@@ -7,3 +7,4 @@ export { CalendarArgsSchema, type CalendarArgs } from './calendar.schema.js';
 export { MapsArgsSchema, type MapsArgs } from './maps.schema.js';
 export { SafariArgsSchema, type SafariArgs } from './safari.schema.js';
 export { PhotosArgsSchema, type PhotosArgs } from './photos.schema.js';
+export { NumbersArgsSchema, type NumbersArgs } from './numbers.schema.js';

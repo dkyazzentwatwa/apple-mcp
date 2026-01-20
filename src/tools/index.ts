@@ -9,6 +9,7 @@ import { CALENDAR_TOOL, handleCalendar } from './calendar.tool.js';
 import { MAPS_TOOL, handleMaps } from './maps.tool.js';
 import { SAFARI_TOOL, handleSafari } from './safari.tool.js';
 import { PHOTOS_TOOL, handlePhotos } from './photos.tool.js';
+import { NUMBERS_TOOL, handleNumbers } from './numbers.tool.js';
 
 export const tools: Tool[] = [
   CONTACTS_TOOL,
@@ -19,7 +20,8 @@ export const tools: Tool[] = [
   CALENDAR_TOOL,
   MAPS_TOOL,
   SAFARI_TOOL,
-  PHOTOS_TOOL
+  PHOTOS_TOOL,
+  NUMBERS_TOOL
 ];
 
 export const handlers: Record<string, (args: unknown) => Promise<{
@@ -34,7 +36,8 @@ export const handlers: Record<string, (args: unknown) => Promise<{
   calendar: handleCalendar,
   maps: handleMaps,
   safari: handleSafari,
-  photos: handlePhotos
+  photos: handlePhotos,
+  numbers: handleNumbers
 };
 
 export {
@@ -47,6 +50,7 @@ export {
   MAPS_TOOL,
   SAFARI_TOOL,
   PHOTOS_TOOL,
+  NUMBERS_TOOL,
   handleContacts,
   handleNotes,
   handleMessages,
@@ -55,5 +59,6 @@ export {
   handleCalendar,
   handleMaps,
   handleSafari,
-  handlePhotos
+  handlePhotos,
+  handleNumbers
 };

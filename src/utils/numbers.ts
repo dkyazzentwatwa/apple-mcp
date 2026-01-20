@@ -1104,6 +1104,98 @@ return "Success"`;
 }
 
 /**
+ * Format multiple cells at once (batch operation)
+ */
+async function formatCells(
+  documentName: string,
+  sheetName: string,
+  cells: Array<{
+    cellReference: string;
+    backgroundColor?: string;
+    textColor?: string;
+    fontName?: string;
+    fontSize?: number;
+    alignment?: string;
+    verticalAlignment?: string;
+    textWrap?: boolean;
+  }>,
+  tableName?: string
+): Promise<{ success: boolean; message: string; cellsFormatted: number }> {
+  try {
+    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+
+    // Build formatting commands for all cells
+    const allCommands: string[] = [];
+
+    for (const cell of cells) {
+      if (cell.backgroundColor) {
+        const rgb = hexToAppleScriptRGB(cell.backgroundColor);
+        allCommands.push(`        set background color of cell "${cell.cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+      }
+
+      if (cell.textColor) {
+        const rgb = hexToAppleScriptRGB(cell.textColor);
+        allCommands.push(`        set text color of cell "${cell.cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+      }
+
+      if (cell.fontName) {
+        allCommands.push(`        set font name of cell "${cell.cellReference}" to "${cell.fontName}"`);
+      }
+
+      if (cell.fontSize) {
+        allCommands.push(`        set font size of cell "${cell.cellReference}" to ${cell.fontSize}`);
+      }
+
+      if (cell.alignment) {
+        allCommands.push(`        set alignment of cell "${cell.cellReference}" to ${cell.alignment}`);
+      }
+
+      if (cell.verticalAlignment) {
+        allCommands.push(`        set vertical alignment of cell "${cell.cellReference}" to ${cell.verticalAlignment}`);
+      }
+
+      if (cell.textWrap !== undefined) {
+        allCommands.push(`        set text wrap of cell "${cell.cellReference}" to ${cell.textWrap}`);
+      }
+    }
+
+    if (allCommands.length === 0) {
+      return {
+        success: false,
+        message: 'No formatting options provided for any cells',
+        cellsFormatted: 0
+      };
+    }
+
+    const script = `
+tell application "Numbers"
+  tell document "${documentName}"
+    tell sheet "${sheetName}"
+      tell ${tableRef}
+${allCommands.join('\n')}
+      end tell
+    end tell
+  end tell
+end tell
+return "Success"`;
+
+    await runAppleScript(script);
+
+    return {
+      success: true,
+      message: `Applied formatting to ${cells.length} cell(s) in a single operation`,
+      cellsFormatted: cells.length
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to format cells: ${error instanceof Error ? error.message : String(error)}`,
+      cellsFormatted: 0
+    };
+  }
+}
+
+/**
  * Set column width
  */
 async function setColumnWidth(
@@ -1271,6 +1363,7 @@ export default {
   getFormula,
   setFormula,
   formatCell,
+  formatCells,
   setNumberFormat,
   setColumnWidth,
   setRowHeight,

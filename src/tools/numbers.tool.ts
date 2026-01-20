@@ -15,14 +15,23 @@ IMPORTANT USAGE PATTERNS:
    - Proper insertion points to avoid breaking document structure
 
 2. When adding data with appendRow:
-   - Use insertPosition='after-headers' to add data RIGHT AFTER the header row (typically row 2)
-   - Use insertPosition='after-data' (DEFAULT) to append to the data section BEFORE footers/summaries
-   - AVOID insertPosition='at-end' unless you specifically want to add footer/summary rows
+   - Use insertPosition='after-headers' (DEFAULT) to add data RIGHT AFTER the header row (typically row 2)
+     → Best for: building datasets from scratch, adding data that should start at the top
+   - Use insertPosition='after-data' to append to the END of the data section BEFORE footers
+     → Best for: appending to logs/lists, adding entries where newest should be at bottom
+   - Use insertPosition='at-end' to add footer/summary rows ONLY
+     → Rarely used, adds after all content including footers
 
 3. Document structure (typical):
    - Row 1: Headers
    - Rows 2-N: Data
    - Rows N+1 onwards: Footers/summaries (if any)
+
+4. When formatting cells:
+   - Use formatCells (RECOMMENDED) to format multiple cells in a single atomic operation
+     → More reliable, faster, and prevents partial failures
+     → Example: Format all header cells with colors and fonts at once
+   - Use formatCell only for single cell formatting operations
 
 Supports: table structure analysis, reading/writing data, searching, row manipulation, formula operations,
 and comprehensive formatting (colors, fonts, alignment, number formats, column widths, row heights, cell merging).
@@ -321,6 +330,23 @@ export async function handleNumbers(args: unknown) {
             verticalAlignment: parsed.verticalAlignment,
             textWrap: parsed.textWrap
           },
+          parsed.tableName
+        );
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: result.message
+          }],
+          isError: !result.success
+        };
+      }
+
+      case 'formatCells': {
+        const result = await numbersUtil.formatCells(
+          parsed.documentName,
+          parsed.sheetName,
+          parsed.cells,
           parsed.tableName
         );
 

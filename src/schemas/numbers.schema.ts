@@ -42,7 +42,7 @@ const AppendRowSchema = z.object({
   sheetName: z.string().min(1, 'sheetName is required').describe('Name of the sheet'),
   tableName: z.string().optional().describe('Name of the table (defaults to first table)'),
   values: z.array(z.union([z.string(), z.number()])).min(1, 'values array must not be empty').describe('Array of values for each column in the new row'),
-  insertPosition: z.enum(['after-headers', 'after-data', 'at-end']).optional().default('after-data').describe('Where to insert: after-headers (row 2), after-data (before footers/summaries, DEFAULT), or at-end (very bottom)')
+  insertPosition: z.enum(['after-headers', 'after-data', 'at-end']).optional().default('after-headers').describe('Where to insert: after-headers (row 2, DEFAULT - starts data from top), after-data (before footers, use when appending to existing data), or at-end (very bottom, rarely used)')
 });
 
 // Advanced Operations (Phase 2) - Will be added later
@@ -116,6 +116,23 @@ const FormatCellSchema = z.object({
   textWrap: z.boolean().optional().describe('Enable or disable text wrapping')
 });
 
+const FormatCellsSchema = z.object({
+  operation: z.literal('formatCells').describe('Format multiple cells at once (more reliable than formatCell for batch operations)'),
+  documentName: z.string().min(1, 'documentName is required').describe('Name of the Numbers document'),
+  sheetName: z.string().min(1, 'sheetName is required').describe('Name of the sheet'),
+  tableName: z.string().optional().describe('Name of the table (defaults to first table)'),
+  cells: z.array(z.object({
+    cellReference: z.string().min(1).describe('Cell reference in A1 notation (e.g., "A2")'),
+    backgroundColor: z.string().optional().describe('Background color as hex (#RRGGBB) or named color'),
+    textColor: z.string().optional().describe('Text color as hex (#RRGGBB) or named color'),
+    fontName: z.string().optional().describe('Font name (e.g., "Avenir Next")'),
+    fontSize: z.number().optional().describe('Font size in points'),
+    alignment: z.enum(['left', 'right', 'center', 'auto align']).optional().describe('Horizontal alignment'),
+    verticalAlignment: z.enum(['top', 'bottom', 'middle']).optional().describe('Vertical alignment'),
+    textWrap: z.boolean().optional().describe('Enable or disable text wrapping')
+  })).min(1, 'cells array must not be empty').describe('Array of cells to format with their respective formatting options')
+});
+
 const SetNumberFormatSchema = z.object({
   operation: z.literal('setNumberFormat').describe('Set number format for a cell (currency, percent, etc.)'),
   documentName: z.string().min(1, 'documentName is required').describe('Name of the Numbers document'),
@@ -185,6 +202,7 @@ export const NumbersArgsSchema = z.discriminatedUnion('operation', [
   GetFormulaSchema,
   SetFormulaSchema,
   FormatCellSchema,
+  FormatCellsSchema,
   SetNumberFormatSchema,
   SetColumnWidthSchema,
   SetRowHeightSchema,

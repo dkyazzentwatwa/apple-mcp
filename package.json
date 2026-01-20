@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "module": "src/index.ts",
   "type": "module",
-  "description": "Apple MCP tools for contacts, notes, messages, mail, reminders, calendar, maps, safari, and photos integration",
+  "description": "Apple MCP tools for contacts, notes, messages, mail, reminders, calendar, maps, safari, photos, and numbers (spreadsheets) integration",
   "author": "Dhravya Shah",
   "license": "MIT",
   "repository": {
@@ -22,6 +22,8 @@
     "maps",
     "safari",
     "photos",
+    "numbers",
+    "spreadsheet",
     "claude"
   ],
   "bin": {

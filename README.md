@@ -8,7 +8,7 @@
 
 **Control your entire macOS ecosystem through Claude and other AI assistants**
 
-A powerful Model Context Protocol (MCP) server that provides seamless integration with native Apple applications including Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, and Photos.
+A powerful Model Context Protocol (MCP) server that provides seamless integration with native Apple applications including Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, Photos, and Numbers.
 
 <a href="https://glama.ai/mcp/servers/gq2qg6kxtu">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/gq2qg6kxtu/badge" alt="Apple MCP Server" />
@@ -23,22 +23,24 @@ A powerful Model Context Protocol (MCP) server that provides seamless integratio
 ## ✨ Highlights
 
 - 🗺️ **AI-Powered Route Analysis** - Get turn-by-turn directions with distance, duration, and alternative routes using native MapKit
+- 📊 **Numbers Integration** - Full spreadsheet control with formulas, formatting, and intelligent structure awareness
 - 🌐 **Safari Integration** - Access bookmarks, reading list, and open tabs
 - 📸 **Photos Integration** - Search photos with ML-based recognition
 - 💬 **iMessage Automation** - Send messages and read conversations
 - 📧 **Mail Management** - Read, search, and send emails
 - 🔒 **Privacy-First** - All processing happens locally on your Mac
-- 🧩 **9 Native Apps** - Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, Photos
+- 🧩 **10 Native Apps** - Contacts, Notes, Messages, Mail, Reminders, Calendar, Maps, Safari, Photos, Numbers
 
 ## 🆕 What's New in v2.0
 
 - **Modular Architecture**: Completely refactored for better maintainability
+- **Numbers Integration**: Full Apple Numbers spreadsheet support with formulas, formatting, and smart structure detection
 - **Safari Integration**: Access bookmarks, reading list, and open tabs
 - **Photos Integration**: Search photos, list albums, get recent photos
 - **AI-Powered Route Analysis**: Get detailed route information (distance, duration, turn-by-turn directions, alternative routes) using native MapKit framework
 - **Updated MCP SDK**: Now using @modelcontextprotocol/sdk v1.25.x
 - **Zod Validation**: Type-safe argument validation with better error messages
-- **Testing**: Added comprehensive Vitest test suite
+- **Testing**: Added comprehensive Vitest test suite with 100+ tests
 - **Removed**: Web search tool (Claude has built-in web search)
 
 ## 🚀 Quick Install
@@ -188,6 +190,34 @@ npm run build:swift-helpers
 - Get photos from specific albums
 </details>
 
+<details>
+<summary>📊 <b>Numbers (Spreadsheets)</b></summary>
+
+**Data Operations:**
+- Read and write spreadsheet data
+- Get table structure and metadata
+- Search and find data across sheets
+- Update cells, ranges, and append rows
+
+**Advanced Features:**
+- Formula operations (get/set formulas)
+- Cell formatting (colors, fonts, alignment, text wrap)
+- Bulk cell formatting for atomic operations
+- Number formatting (currency, percentage, date, etc.)
+- Row and column manipulation (insert/delete)
+- Column width and row height control
+- Cell merging and unmerging
+- Smart insertion (after headers, after data, at end)
+
+**💡 Intelligent Structure Awareness:**
+- Automatically detects headers and footers
+- Provides proper insertion points
+- Prevents breaking document structure
+- Supports multiple tables per sheet
+
+**Note:** Documents must be open in Numbers to access them.
+</details>
+
 ## 💡 Example Usage
 
 ```
@@ -218,6 +248,10 @@ Show me my Safari reading list
 Analyze the route from San Francisco to San Jose and suggest the fastest way to get there
 ```
 
+```
+Read the expenses from my Numbers spreadsheet and calculate the total
+```
+
 ## 🔗 Workflow Examples
 
 Chain multiple tools together:
@@ -229,6 +263,16 @@ and send them a message saying "Great meeting you!"
 
 ```
 Check my unread emails, find any meeting invites, and add them to my calendar
+```
+
+```
+Read my expenses from the Numbers spreadsheet, calculate the monthly total,
+and create a reminder to review the budget
+```
+
+```
+Get my upcoming calendar events for this week and add them to a new Numbers
+spreadsheet with columns for Date, Event, and Duration
 ```
 
 ## 🛠️ Local Development

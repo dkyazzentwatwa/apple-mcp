@@ -2,9 +2,8 @@
 
 # 🍎 Apple MCP Server
 
-[![smithery badge](https://smithery.ai/badge/@Dhravya/apple-mcp)](https://smithery.ai/server/@Dhravya/apple-mcp)
-[![npm version](https://badge.fury.io/js/@dhravya%2Fapple-mcp.svg)](https://www.npmjs.com/package/@dhravya/apple-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub](https://img.shields.io/badge/GitHub-dkyazzentwatwa%2Fapple--mcp-blue?logo=github)](https://github.com/dkyazzentwatwa/apple-mcp)
 
 **Control your entire macOS ecosystem through Claude and other AI assistants**
 
@@ -45,7 +44,39 @@ A powerful Model Context Protocol (MCP) server that provides seamless integratio
 
 ## 🚀 Quick Install
 
-### Via Smithery (Recommended)
+### From Source (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/dkyazzentwatwa/apple-mcp.git
+cd apple-mcp
+
+# Install dependencies
+npm install
+
+# Build Swift helpers for route analysis (requires Xcode Command Line Tools)
+xcode-select --install  # If not already installed
+npm run build:swift-helpers
+```
+
+Then add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "apple-mcp": {
+      "command": "node",
+      "args": ["/path/to/apple-mcp/build/index.js"]
+    }
+  }
+}
+```
+
+Replace `/path/to/apple-mcp` with the actual path where you cloned the repository.
+
+### Via Original Package
+
+You can also install the original upstream package:
 
 ```bash
 # For Claude Desktop
@@ -53,52 +84,6 @@ npx -y @smithery/cli@latest install @Dhravya/apple-mcp --client claude
 
 # For Cursor
 npx -y @smithery/cli@latest install @Dhravya/apple-mcp --client cursor
-```
-
-**First-Time Setup** (for route analysis features):
-1. Install Xcode Command Line Tools: `xcode-select --install`
-2. The Swift helper builds automatically during installation
-3. Restart Claude Desktop
-
-### Manual Configuration
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "apple-mcp": {
-      "command": "bunx",
-      "args": ["@dhravya/apple-mcp@latest"]
-    }
-  }
-}
-```
-
-**⚠️ Important**: When using `bunx`, route analysis requires a one-time setup:
-
-```bash
-# Navigate to the package location
-cd ~/Library/Application\ Support/Claude/node_modules/@dhravya/apple-mcp
-# Or wherever bunx caches packages
-
-# Install dependencies and build Swift helper
-npm install
-npm run build:swift-helpers
-
-# Restart Claude Desktop
-```
-
-**Alternative**: Use npm install instead:
-```json
-{
-  "mcpServers": {
-    "apple-mcp": {
-      "command": "npx",
-      "args": ["-y", "@dhravya/apple-mcp@latest"]
-    }
-  }
-}
 ```
 
 ## 📋 Features
@@ -278,7 +263,7 @@ spreadsheet with columns for Date, Event, and Duration
 ## 🛠️ Local Development
 
 ```bash
-git clone https://github.com/dhravya/apple-mcp.git
+git clone https://github.com/dkyazzentwatwa/apple-mcp.git
 cd apple-mcp
 npm install
 # Build Swift helpers for route analysis (requires Xcode Command Line Tools)
@@ -428,13 +413,14 @@ Contributions are welcome! This is an open-source project and we'd love your hel
 
 - Built with the [Model Context Protocol](https://modelcontextprotocol.io/)
 - Powered by [Anthropic's Claude](https://www.anthropic.com/claude)
-- Thanks to all [contributors](https://github.com/dhravya/apple-mcp/graphs/contributors)
+- Forked from [dhravya/apple-mcp](https://github.com/dhravya/apple-mcp)
+- Thanks to all [contributors](https://github.com/dkyazzentwatwa/apple-mcp/graphs/contributors)
 
 ---
 
 <div align="center">
 
-**[⭐ Star this repo](https://github.com/dhravya/apple-mcp)** if you find it useful!
+**[⭐ Star this repo](https://github.com/dkyazzentwatwa/apple-mcp)** if you find it useful!
 
 Made with ❤️ for the macOS + AI community
 

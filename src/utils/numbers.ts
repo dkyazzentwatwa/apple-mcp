@@ -1,5 +1,6 @@
 import { run } from '@jxa/run';
 import { runAppleScript } from 'run-applescript';
+import { escapeAppleScript } from './escape.js';
 
 // Type definitions
 export interface NumbersDocument {
@@ -479,19 +480,19 @@ async function updateCell(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Use AppleScript for reliable cell updates
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
-    // Escape quotes in string values
+    // Escape all interpolated values
     const escapedValue = typeof value === 'string'
-      ? value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      ? escapeAppleScript(value)
       : value;
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        set value of cell "${cellReference}" to ${typeof value === 'string' ? `"${escapedValue}"` : value}
+        set value of cell "${escapeAppleScript(cellReference)}" to ${typeof value === 'string' ? `"${escapedValue}"` : value}
       end tell
     end tell
   end tell
@@ -540,12 +541,12 @@ async function appendRow(
     }
 
     // Use AppleScript for reliable row manipulation
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     // Build cell assignments
     const cellAssignments = values.map((val, idx) => {
       const escapedValue = typeof val === 'string'
-        ? val.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        ? escapeAppleScript(val)
         : val;
       const valueStr = typeof val === 'string' ? `"${escapedValue}"` : val;
       return `        set value of cell ${idx + 1} of newRow to ${valueStr}`;
@@ -553,8 +554,8 @@ async function appendRow(
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
         set newRow to make new row at after row ${insertAfterRow}
         ${cellAssignments}
@@ -596,7 +597,7 @@ async function updateRange(
     const { row: startRow, col: startCol } = parseA1Notation(startCell);
 
     // Use AppleScript for reliable range updates
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     // Build cell assignments
     let cellsUpdated = 0;
@@ -611,19 +612,19 @@ async function updateRange(
         const cellRef = `${numberToColumn(targetCol)}${targetRow}`;
 
         const escapedValue = typeof value === 'string'
-          ? value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          ? escapeAppleScript(value)
           : value;
         const valueStr = typeof value === 'string' ? `"${escapedValue}"` : value;
 
-        cellAssignments.push(`        set value of cell "${cellRef}" to ${valueStr}`);
+        cellAssignments.push(`        set value of cell "${escapeAppleScript(cellRef)}" to ${valueStr}`);
         cellsUpdated++;
       }
     }
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
 ${cellAssignments.join('\n')}
       end tell
@@ -782,12 +783,12 @@ async function insertRows(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Use AppleScript for reliable row insertion
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
         repeat ${count} times
           ${afterRow === 0
@@ -826,7 +827,7 @@ async function deleteRows(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Use AppleScript for reliable row deletion
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     // Delete in reverse order to maintain indices
     const deleteStatements = [];
@@ -836,8 +837,8 @@ async function deleteRows(
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
 ${deleteStatements.join('\n')}
       end tell
@@ -943,20 +944,20 @@ async function setFormula(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Use AppleScript for reliable formula setting
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     // Ensure formula starts with =
     const finalFormula = formula.startsWith('=') ? formula : `=${formula}`;
 
-    // Escape quotes in formula
-    const escapedFormula = finalFormula.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    // Escape all interpolated values
+    const escapedFormula = escapeAppleScript(finalFormula);
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        set formula of cell "${cellReference}" to "${escapedFormula}"
+        set formula of cell "${escapeAppleScript(cellReference)}" to "${escapedFormula}"
       end tell
     end tell
   end tell
@@ -988,14 +989,14 @@ async function setNumberFormat(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        set format of cell "${cellReference}" to ${format}
+        set format of cell "${escapeAppleScript(cellReference)}" to ${format}
       end tell
     end tell
   end tell
@@ -1035,39 +1036,40 @@ async function formatCell(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
+    const escapedCellRef = escapeAppleScript(cellReference);
 
     // Build formatting commands
     const commands: string[] = [];
 
     if (options.backgroundColor) {
       const rgb = hexToAppleScriptRGB(options.backgroundColor);
-      commands.push(`        set background color of cell "${cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+      commands.push(`        set background color of cell "${escapedCellRef}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
     }
 
     if (options.textColor) {
       const rgb = hexToAppleScriptRGB(options.textColor);
-      commands.push(`        set text color of cell "${cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+      commands.push(`        set text color of cell "${escapedCellRef}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
     }
 
     if (options.fontName) {
-      commands.push(`        set font name of cell "${cellReference}" to "${options.fontName}"`);
+      commands.push(`        set font name of cell "${escapedCellRef}" to "${escapeAppleScript(options.fontName)}"`);
     }
 
     if (options.fontSize) {
-      commands.push(`        set font size of cell "${cellReference}" to ${options.fontSize}`);
+      commands.push(`        set font size of cell "${escapedCellRef}" to ${options.fontSize}`);
     }
 
     if (options.alignment) {
-      commands.push(`        set alignment of cell "${cellReference}" to ${options.alignment}`);
+      commands.push(`        set alignment of cell "${escapedCellRef}" to ${options.alignment}`);
     }
 
     if (options.verticalAlignment) {
-      commands.push(`        set vertical alignment of cell "${cellReference}" to ${options.verticalAlignment}`);
+      commands.push(`        set vertical alignment of cell "${escapedCellRef}" to ${options.verticalAlignment}`);
     }
 
     if (options.textWrap !== undefined) {
-      commands.push(`        set text wrap of cell "${cellReference}" to ${options.textWrap}`);
+      commands.push(`        set text wrap of cell "${escapedCellRef}" to ${options.textWrap}`);
     }
 
     if (commands.length === 0) {
@@ -1079,8 +1081,8 @@ async function formatCell(
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
 ${commands.join('\n')}
       end tell
@@ -1122,40 +1124,42 @@ async function formatCells(
   tableName?: string
 ): Promise<{ success: boolean; message: string; cellsFormatted: number }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     // Build formatting commands for all cells
     const allCommands: string[] = [];
 
     for (const cell of cells) {
+      const escapedRef = escapeAppleScript(cell.cellReference);
+
       if (cell.backgroundColor) {
         const rgb = hexToAppleScriptRGB(cell.backgroundColor);
-        allCommands.push(`        set background color of cell "${cell.cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+        allCommands.push(`        set background color of cell "${escapedRef}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
       }
 
       if (cell.textColor) {
         const rgb = hexToAppleScriptRGB(cell.textColor);
-        allCommands.push(`        set text color of cell "${cell.cellReference}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
+        allCommands.push(`        set text color of cell "${escapedRef}" to {${rgb.r}, ${rgb.g}, ${rgb.b}}`);
       }
 
       if (cell.fontName) {
-        allCommands.push(`        set font name of cell "${cell.cellReference}" to "${cell.fontName}"`);
+        allCommands.push(`        set font name of cell "${escapedRef}" to "${escapeAppleScript(cell.fontName)}"`);
       }
 
       if (cell.fontSize) {
-        allCommands.push(`        set font size of cell "${cell.cellReference}" to ${cell.fontSize}`);
+        allCommands.push(`        set font size of cell "${escapedRef}" to ${cell.fontSize}`);
       }
 
       if (cell.alignment) {
-        allCommands.push(`        set alignment of cell "${cell.cellReference}" to ${cell.alignment}`);
+        allCommands.push(`        set alignment of cell "${escapedRef}" to ${cell.alignment}`);
       }
 
       if (cell.verticalAlignment) {
-        allCommands.push(`        set vertical alignment of cell "${cell.cellReference}" to ${cell.verticalAlignment}`);
+        allCommands.push(`        set vertical alignment of cell "${escapedRef}" to ${cell.verticalAlignment}`);
       }
 
       if (cell.textWrap !== undefined) {
-        allCommands.push(`        set text wrap of cell "${cell.cellReference}" to ${cell.textWrap}`);
+        allCommands.push(`        set text wrap of cell "${escapedRef}" to ${cell.textWrap}`);
       }
     }
 
@@ -1169,8 +1173,8 @@ async function formatCells(
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
 ${allCommands.join('\n')}
       end tell
@@ -1206,14 +1210,14 @@ async function setColumnWidth(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        set width of column "${column}" to ${width}
+        set width of column "${escapeAppleScript(column)}" to ${width}
       end tell
     end tell
   end tell
@@ -1245,12 +1249,12 @@ async function setRowHeight(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
         set height of row ${row} to ${height}
       end tell
@@ -1283,14 +1287,14 @@ async function mergeCells(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        merge range "${range}"
+        merge range "${escapeAppleScript(range)}"
       end tell
     end tell
   end tell
@@ -1321,14 +1325,14 @@ async function unmergeCells(
   tableName?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const tableRef = tableName ? `table "${tableName}"` : 'table 1';
+    const tableRef = tableName ? `table "${escapeAppleScript(tableName)}"` : 'table 1';
 
     const script = `
 tell application "Numbers"
-  tell document "${documentName}"
-    tell sheet "${sheetName}"
+  tell document "${escapeAppleScript(documentName)}"
+    tell sheet "${escapeAppleScript(sheetName)}"
       tell ${tableRef}
-        unmerge range "${range}"
+        unmerge range "${escapeAppleScript(range)}"
       end tell
     end tell
   end tell

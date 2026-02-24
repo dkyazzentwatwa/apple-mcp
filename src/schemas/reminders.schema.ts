@@ -6,56 +6,56 @@ const ListRemindersSchema = z.object({
 
 const SearchRemindersSchema = z.object({
   operation: z.literal('search').describe('Search for reminders by text across all lists. Requires searchText parameter.'),
-  searchText: z.string().min(1, 'searchText is required for search operation').describe('Text to search for in reminder names and notes')
+  searchText: z.string().min(1, 'searchText is required for search operation').max(500).describe('Text to search for in reminder names and notes')
 });
 
 const OpenReminderSchema = z.object({
   operation: z.literal('open').describe('Open the Reminders app and find a specific reminder by text.'),
-  searchText: z.string().min(1, 'searchText is required for open operation').describe('Text to search for to open reminder')
+  searchText: z.string().min(1, 'searchText is required for open operation').max(500).describe('Text to search for to open reminder')
 });
 
 const CreateReminderSchema = z.object({
   operation: z.literal('create').describe('Create a new reminder in a specified list.'),
-  name: z.string().min(1, 'name is required for create operation').describe('Name of the reminder to create'),
-  listName: z.string().optional().describe('Name of the list to create the reminder in (default: Reminders)'),
-  listId: z.string().optional().describe('ID of the list to create the reminder in (takes precedence over listName)'),
-  notes: z.string().optional().describe('Additional notes for the reminder'),
-  dueDate: z.string().optional().describe('Due date for the reminder in ISO format')
+  name: z.string().min(1, 'name is required for create operation').max(1000).describe('Name of the reminder to create'),
+  listName: z.string().max(200).optional().describe('Name of the list to create the reminder in (default: Reminders)'),
+  listId: z.string().max(500).optional().describe('ID of the list to create the reminder in (takes precedence over listName)'),
+  notes: z.string().max(10000).optional().describe('Additional notes for the reminder'),
+  dueDate: z.string().max(100).optional().describe('Due date for the reminder in ISO format')
 });
 
 const ListByIdSchema = z.object({
   operation: z.literal('listById').describe('Get all reminders from a specific list using its ID. Use "list" operation first to get list IDs.'),
-  listId: z.string().min(1, 'listId is required for listById operation').describe('ID of the list to get reminders from (get IDs from "list" operation)'),
-  props: z.array(z.string()).optional().describe('Properties to include in the reminders')
+  listId: z.string().min(1, 'listId is required for listById operation').max(500).describe('ID of the list to get reminders from (get IDs from "list" operation)'),
+  props: z.array(z.string().max(100)).max(50).optional().describe('Properties to include in the reminders')
 });
 
 const GetByListNameSchema = z.object({
   operation: z.literal('getByListName').describe('Get all reminders from a list by its name (e.g., "Tasks", "Work", "Grocery"). Preferred over listById.'),
-  listName: z.string().min(1, 'listName is required').describe('Name of the reminder list (e.g., "Tasks", "Work", "Grocery")')
+  listName: z.string().min(1, 'listName is required').max(200).describe('Name of the reminder list (e.g., "Tasks", "Work", "Grocery")')
 });
 
 const CreateListSchema = z.object({
   operation: z.literal('createList').describe('Create a new reminder list.'),
-  listName: z.string().min(1, 'listName is required').describe('Name for the new reminder list')
+  listName: z.string().min(1, 'listName is required').max(200).describe('Name for the new reminder list')
 });
 
 const CompleteReminderSchema = z.object({
   operation: z.literal('complete').describe('Mark a reminder as complete or incomplete.'),
-  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to complete'),
+  reminderId: z.string().min(1, 'reminderId is required').max(500).describe('ID of the reminder to complete'),
   completed: z.boolean().default(true).describe('Set to true to mark complete, false to mark incomplete')
 });
 
 const UpdateReminderSchema = z.object({
   operation: z.literal('update').describe('Update a reminder\'s properties.'),
-  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to update'),
-  name: z.string().optional().describe('New name for the reminder'),
-  notes: z.string().optional().describe('New notes for the reminder'),
-  dueDate: z.string().optional().describe('New due date in ISO format (or empty string to clear)')
+  reminderId: z.string().min(1, 'reminderId is required').max(500).describe('ID of the reminder to update'),
+  name: z.string().max(1000).optional().describe('New name for the reminder'),
+  notes: z.string().max(10000).optional().describe('New notes for the reminder'),
+  dueDate: z.string().max(100).optional().describe('New due date in ISO format (or empty string to clear)')
 });
 
 const DeleteReminderSchema = z.object({
   operation: z.literal('delete').describe('Delete a reminder.'),
-  reminderId: z.string().min(1, 'reminderId is required').describe('ID of the reminder to delete')
+  reminderId: z.string().min(1, 'reminderId is required').max(500).describe('ID of the reminder to delete')
 });
 
 export const RemindersArgsSchema = z.discriminatedUnion('operation', [

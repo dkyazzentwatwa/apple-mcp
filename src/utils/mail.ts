@@ -1,5 +1,6 @@
 import { run } from "@jxa/run";
 import { runAppleScript } from "run-applescript";
+import { escapeAppleScript } from "./escape.js";
 
 async function checkMailAccess(): Promise<boolean> {
   try {
@@ -77,12 +78,12 @@ async function getUnreadMails(
 
     // Build account filter clause for AppleScript
     const accountClause = accountFilter
-      ? `set targetAccounts to (accounts whose name is "${accountFilter.replace(/"/g, '\\"')}")`
+      ? `set targetAccounts to (accounts whose name is "${escapeAppleScript(accountFilter)}")`
       : `set targetAccounts to accounts`;
 
     // Build mailbox filter - if specified, only look in that mailbox name
     const mailboxCheck = mailboxFilter
-      ? `if (name of m) is not "${mailboxFilter.replace(/"/g, '\\"')}" then continue repeat`
+      ? `if (name of m) is not "${escapeAppleScript(mailboxFilter)}" then continue repeat`
       : ``;
 
     // First, try with AppleScript which might be more reliable for this case
@@ -371,19 +372,19 @@ end if`);
 
     // Build account filter clause for AppleScript
     const accountClause = accountFilter
-      ? `set targetAccounts to (accounts whose name is "${accountFilter.replace(/"/g, '\\"')}")`
+      ? `set targetAccounts to (accounts whose name is "${escapeAppleScript(accountFilter)}")`
       : `set targetAccounts to accounts`;
 
     // Build mailbox filter
     const mailboxCheck = mailboxFilter
-      ? `if (name of currentBox) is not "${mailboxFilter.replace(/"/g, '\\"')}" then continue repeat`
+      ? `if (name of currentBox) is not "${escapeAppleScript(mailboxFilter)}" then continue repeat`
       : ``;
 
     // First try the AppleScript approach which might be more reliable
     try {
       const script = `
 tell application "Mail"
-    set searchString to "${searchTerm.replace(/"/g, '\\"')}"
+    set searchString to "${escapeAppleScript(searchTerm)}"
     set foundMsgs to {}
     ${accountClause}
 
@@ -567,11 +568,11 @@ if application "Mail" is not running then
 end if`);
 
     // Escape special characters in strings for AppleScript
-    const escapedTo = to.replace(/"/g, '\\"');
-    const escapedSubject = subject.replace(/"/g, '\\"');
-    const escapedBody = body.replace(/"/g, '\\"');
-    const escapedCc = cc ? cc.replace(/"/g, '\\"') : "";
-    const escapedBcc = bcc ? bcc.replace(/"/g, '\\"') : "";
+    const escapedTo = escapeAppleScript(to);
+    const escapedSubject = escapeAppleScript(subject);
+    const escapedBody = escapeAppleScript(body);
+    const escapedCc = cc ? escapeAppleScript(cc) : "";
+    const escapedBcc = bcc ? escapeAppleScript(bcc) : "";
 
     let script = `
 tell application "Mail"
@@ -751,7 +752,7 @@ async function getMailboxesForAccount(accountName: string): Promise<string[]> {
 tell application "Mail"
     set boxNames to {}
     try
-        set targetAccount to first account whose name is "${accountName.replace(/"/g, '\\"')}"
+        set targetAccount to first account whose name is "${escapeAppleScript(accountName)}"
         set acctMailboxes to every mailbox of targetAccount
         repeat with mb in acctMailboxes
             set end of boxNames to name of mb

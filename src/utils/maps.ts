@@ -3,6 +3,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { writeFile, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { escapeShellArg } from './escape.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -638,9 +641,17 @@ async function analyzeRoute(
         // Execute Swift helper
         console.error(`analyzeRoute - Calculating route from "${fromAddress}" to "${toAddress}" via ${transportType}`);
 
-        const { stdout, stderr } = await execAsync(`echo '${input.replace(/'/g, "'\\''")}' | "${helperPath}"`, {
-            timeout: 30000 // 30 second timeout
-        });
+        // Write input to temp file to avoid shell injection via echo
+        const tmpFile = path.join(tmpdir(), `apple-mcp-maps-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+        let stdout: string, stderr: string;
+        try {
+            await writeFile(tmpFile, input, 'utf-8');
+            ({ stdout, stderr } = await execAsync(`${escapeShellArg(helperPath)} < ${escapeShellArg(tmpFile)}`, {
+                timeout: 30000 // 30 second timeout
+            }));
+        } finally {
+            try { await unlink(tmpFile); } catch { /* ignore cleanup errors */ }
+        }
 
         if (stderr) {
             console.error(`Swift helper stderr: ${stderr}`);

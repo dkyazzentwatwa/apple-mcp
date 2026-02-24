@@ -2,22 +2,22 @@ import { z } from 'zod';
 
 const ListBookmarksSchema = z.object({
   operation: z.literal('listBookmarks'),
-  folder: z.string().optional().describe('Folder to list bookmarks from (optional - lists all if not provided)')
+  folder: z.string().max(500).optional().describe('Folder to list bookmarks from (optional - lists all if not provided)')
 });
 
 const SearchBookmarksSchema = z.object({
   operation: z.literal('searchBookmarks'),
-  query: z.string().min(1, 'query is required for searchBookmarks operation').describe('Search query for bookmark title or URL')
+  query: z.string().min(1, 'query is required for searchBookmarks operation').max(500).describe('Search query for bookmark title or URL')
 });
 
 const GetReadingListSchema = z.object({
   operation: z.literal('getReadingList'),
-  limit: z.number().positive().optional().describe('Number of reading list items to retrieve')
+  limit: z.number().positive().max(500).optional().describe('Number of reading list items to retrieve')
 });
 
 const OpenUrlSchema = z.object({
   operation: z.literal('openUrl'),
-  url: z.string().url('Must be a valid URL').describe('URL to open in Safari')
+  url: z.string().url('Must be a valid URL').max(2000).describe('URL to open in Safari')
 });
 
 const GetCurrentTabSchema = z.object({
@@ -30,8 +30,8 @@ const GetTabsSchema = z.object({
 
 const AddToReadingListSchema = z.object({
   operation: z.literal('addToReadingList'),
-  url: z.string().url('Must be a valid URL').describe('URL to add to reading list'),
-  title: z.string().optional().describe('Title for the reading list item')
+  url: z.string().url('Must be a valid URL').max(2000).describe('URL to add to reading list'),
+  title: z.string().max(1000).optional().describe('Title for the reading list item')
 });
 
 export const SafariArgsSchema = z.discriminatedUnion('operation', [

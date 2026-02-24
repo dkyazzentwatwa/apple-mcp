@@ -1,5 +1,6 @@
 import { run } from '@jxa/run';
 import { runAppleScript } from 'run-applescript';
+import { escapeAppleScript } from './escape.js';
 
 interface Bookmark {
   title: string;
@@ -178,7 +179,7 @@ async function openUrl(url: string): Promise<{ success: boolean; message: string
       return { success: false, message: 'Cannot access Safari' };
     }
 
-    const escapedUrl = url.replace(/"/g, '\\"');
+    const escapedUrl = escapeAppleScript(url);
 
     await runAppleScript(`
       tell application "Safari"
@@ -288,8 +289,8 @@ async function addToReadingList(url: string, title?: string): Promise<{ success:
       return { success: false, message: 'Cannot access Safari' };
     }
 
-    const escapedUrl = url.replace(/"/g, '\\"');
-    const escapedTitle = title ? title.replace(/"/g, '\\"') : '';
+    const escapedUrl = escapeAppleScript(url);
+    const escapedTitle = title ? escapeAppleScript(title) : '';
 
     // Safari's AppleScript support for adding to reading list
     await runAppleScript(`

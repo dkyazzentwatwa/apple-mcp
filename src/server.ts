@@ -56,11 +56,12 @@ export function createServer() {
         };
       }
 
-      // Handle other errors
+      // Log detailed error to stderr for debugging, return sanitized message to client
+      console.error(`Error executing ${name}:`, error);
       return {
         content: [{
           type: 'text' as const,
-          text: `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`
+          text: `Error executing ${name}. Please check the tool arguments and try again.`
         }],
         isError: true
       };

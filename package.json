@@ -41,9 +41,9 @@
   "devDependencies": {
     "@types/bun": "^1.1.14",
     "@types/node": "^22.13.4",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsx": "^4.21.0",
-    "vitest": "^2.1.8"
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

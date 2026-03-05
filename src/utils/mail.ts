@@ -352,56 +352,74 @@ end tell`);
   }
 }
 
-async function searchMails(
-  searchTerm: string,
-  limit: number = 10,
+interface MailboxRef {
+  accountName: string;
+  mailboxName: string;
+}
+
+async function listMailboxes(
   accountFilter?: string,
-  mailboxFilter?: string
+  mailboxFilter?: string,
+): Promise<MailboxRef[]> {
+  const accountClause = accountFilter
+    ? `set targetAccounts to (accounts whose name is "${escapeAppleScript(accountFilter)}")`
+    : `set targetAccounts to accounts`;
+
+  const mailboxCheck = mailboxFilter
+    ? `if (name of mb) is "${escapeAppleScript(mailboxFilter)}" then set end of resultList to (name of acct) & "||" & (name of mb)`
+    : `set end of resultList to (name of acct) & "||" & (name of mb)`;
+
+  const script = `
+tell application "Mail"
+    ${accountClause}
+    set resultList to {}
+    repeat with acct in targetAccounts
+        repeat with mb in mailboxes of acct
+            ${mailboxCheck}
+        end repeat
+    end repeat
+    set AppleScript's text item delimiters to "\\n"
+    return resultList as string
+end tell`;
+
+  const result = await runAppleScript(script);
+  if (!result || result.trim().length === 0) {
+    return [];
+  }
+
+  return result.split("\n").map((line) => {
+    const [accountName, mailboxName] = line.split("||");
+    return { accountName, mailboxName };
+  });
+}
+
+async function searchMailbox(
+  accountName: string,
+  mailboxName: string,
+  searchTerm: string,
+  searchScope: 'subject' | 'sender' | 'all',
+  limit: number,
 ): Promise<EmailMessage[]> {
-  try {
-    if (!(await checkMailAccess())) {
-      return [];
-    }
+  let whoseClause: string;
+  switch (searchScope) {
+    case 'sender':
+      whoseClause = `whose sender contains searchString`;
+      break;
+    case 'all':
+      whoseClause = `whose (subject contains searchString) or (content contains searchString)`;
+      break;
+    case 'subject':
+    default:
+      whoseClause = `whose subject contains searchString`;
+      break;
+  }
 
-    // Ensure Mail app is running
-    await runAppleScript(`
-if application "Mail" is not running then
-    tell application "Mail" to activate
-    delay 2
-end if`);
-
-    // Build account filter clause for AppleScript
-    const accountClause = accountFilter
-      ? `set targetAccounts to (accounts whose name is "${escapeAppleScript(accountFilter)}")`
-      : `set targetAccounts to accounts`;
-
-    // Build mailbox filter
-    const mailboxCheck = mailboxFilter
-      ? `if (name of currentBox) is not "${escapeAppleScript(mailboxFilter)}" then continue repeat`
-      : ``;
-
-    // First try the AppleScript approach which might be more reliable
-    try {
-      const script = `
+  const script = `
 tell application "Mail"
     set searchString to "${escapeAppleScript(searchTerm)}"
-    set foundMsgs to {}
-    ${accountClause}
-
-    repeat with acct in targetAccounts
-        set acctMailboxes to mailboxes of acct
-        repeat with currentBox in acctMailboxes
-            ${mailboxCheck}
-            try
-                set boxMsgs to (messages of currentBox whose (subject contains searchString) or (content contains searchString))
-                set foundMsgs to foundMsgs & boxMsgs
-                if (count of foundMsgs) ≥ ${limit} then exit repeat
-            on error
-                -- Skip mailboxes that error out
-            end try
-        end repeat
-        if (count of foundMsgs) ≥ ${limit} then exit repeat
-    end repeat
+    set targetAccount to first account whose name is "${escapeAppleScript(accountName)}"
+    set targetBox to mailbox "${escapeAppleScript(mailboxName)}" of targetAccount
+    set foundMsgs to (messages of targetBox ${whoseClause})
 
     set resultList to {}
     set msgCount to (count of foundMsgs)
@@ -410,7 +428,6 @@ tell application "Mail"
     repeat with i from 1 to msgCount
         try
             set currentMsg to item i of foundMsgs
-            -- Get content
             set msgContent to "[Content not available]"
             try
                 set msgContent to content of currentMsg
@@ -430,116 +447,97 @@ tell application "Mail"
     return resultList
 end tell`;
 
-      const asResult = await runAppleScript(script);
-
-      // If we got results, parse them
-      if (asResult && asResult.length > 0) {
-        try {
-          const parsedResults = JSON.parse(asResult);
-          if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-            return parsedResults.map((msg) => ({
-              subject: msg.subject || "No subject",
-              sender: msg.sender || "Unknown sender",
-              dateSent: msg.date || new Date().toString(),
-              content: msg.content || "[Content not available]",
-              isRead: msg.isRead || false,
-              mailbox: msg.boxName || "Unknown mailbox",
-            }));
-          }
-        } catch (parseError) {
-          console.error("Error parsing AppleScript result:", parseError);
-          // Continue to JXA approach if parsing fails
-        }
-      }
-    } catch (asError) {
-      // Continue to JXA approach
+  try {
+    const asResult = await runAppleScript(script);
+    if (!asResult || asResult.trim().length === 0) {
+      return [];
     }
 
-    // JXA approach as fallback
-    const searchResults: EmailMessage[] = await run(
-      (args: { searchTerm: string, limit: number, accountFilter?: string, mailboxFilter?: string }) => {
-        const Mail = Application("Mail");
-        const results: any[] = [];
-
-        // Get accounts to search (filtered or all)
-        try {
-          const accounts = Mail.accounts();
-
-          for (const account of accounts) {
-            try {
-              // Skip if account filter specified and doesn't match
-              if (args.accountFilter && account.name() !== args.accountFilter) {
-                continue;
-              }
-
-              const mailboxes = account.mailboxes();
-
-              for (const mailbox of mailboxes) {
-                try {
-                  // Skip if mailbox filter specified and doesn't match
-                  if (args.mailboxFilter && mailbox.name() !== args.mailboxFilter) {
-                    continue;
-                  }
-
-                  // Try to find messages with the search term in subject or content
-                  let messages;
-                  try {
-                    messages = mailbox.messages.whose({
-                      _or: [
-                        { subject: { _contains: args.searchTerm } },
-                        { content: { _contains: args.searchTerm } },
-                      ],
-                    })();
-                  } catch (queryError) {
-                    continue;
-                  }
-
-                  // Take only the most recent messages up to the limit
-                  const count = Math.min(messages.length, args.limit - results.length);
-
-                  for (let i = 0; i < count; i++) {
-                    try {
-                      const msg = messages[i];
-                      results.push({
-                        subject: msg.subject(),
-                        sender: msg.sender(),
-                        dateSent: msg.dateSent().toString(),
-                        content: msg.content()
-                          ? msg.content().substring(0, 500)
-                          : "[No content]",
-                        isRead: msg.readStatus(),
-                        mailbox: `${account.name()} - ${mailbox.name()}`,
-                      });
-                    } catch (msgError) {
-                      // Skip problematic messages
-                    }
-                  }
-
-                  if (results.length >= args.limit) {
-                    break;
-                  }
-                } catch (boxError) {
-                  // Skip problematic mailboxes
-                }
-              }
-
-              if (results.length >= args.limit) {
-                break;
-              }
-            } catch (accError) {
-              // Skip problematic accounts
+    try {
+      const parsedResults = JSON.parse(asResult);
+      if (Array.isArray(parsedResults) && parsedResults.length > 0) {
+        return parsedResults.map((msg) => ({
+          subject: msg.subject || "No subject",
+          sender: msg.sender || "Unknown sender",
+          dateSent: msg.date || new Date().toString(),
+          content: msg.content || "[Content not available]",
+          isRead: msg.isRead || false,
+          mailbox: msg.boxName || "Unknown mailbox",
+        }));
+      }
+    } catch {
+      // AppleScript record format — try simple parsing
+      const matches = asResult.match(/\{([^}]+)\}/g);
+      if (matches && matches.length > 0) {
+        const parsedEmails: EmailMessage[] = [];
+        for (const match of matches) {
+          const props = match.substring(1, match.length - 1).split(",");
+          const emailData: Record<string, string> = {};
+          for (const prop of props) {
+            const parts = prop.split(":");
+            if (parts.length >= 2) {
+              emailData[parts[0].trim()] = parts.slice(1).join(":").trim();
             }
           }
-        } catch (mbError) {
-          // Return empty results on error
+          if (emailData.subject || emailData.sender) {
+            parsedEmails.push({
+              subject: emailData.subject || "No subject",
+              sender: emailData.sender || "Unknown sender",
+              dateSent: emailData.date || new Date().toString(),
+              content: emailData.content || "[Content not available]",
+              isRead: emailData.isRead === "true",
+              mailbox: emailData.boxName || "Unknown mailbox",
+            });
+          }
         }
+        return parsedEmails;
+      }
+    }
 
-        return results.slice(0, args.limit);
-      },
-      { searchTerm, limit, accountFilter, mailboxFilter },
-    );
+    return [];
+  } catch {
+    // Per-mailbox errors are silently skipped
+    return [];
+  }
+}
 
-    return searchResults;
+async function searchMails(
+  searchTerm: string,
+  limit: number = 10,
+  accountFilter?: string,
+  mailboxFilter?: string,
+  searchScope: 'subject' | 'sender' | 'all' = 'subject'
+): Promise<EmailMessage[]> {
+  try {
+    if (!(await checkMailAccess())) {
+      return [];
+    }
+
+    // Step 1: Enumerate mailboxes
+    const mailboxes = await listMailboxes(accountFilter, mailboxFilter);
+    if (mailboxes.length === 0) {
+      return [];
+    }
+
+    // Step 2: Search each mailbox sequentially, accumulating results
+    const results: EmailMessage[] = [];
+    for (const mb of mailboxes) {
+      if (results.length >= limit) {
+        break;
+      }
+
+      const remaining = limit - results.length;
+      const found = await searchMailbox(
+        mb.accountName,
+        mb.mailboxName,
+        searchTerm,
+        searchScope,
+        remaining,
+      );
+      results.push(...found);
+    }
+
+    return results.slice(0, limit);
   } catch (error) {
     console.error("Error in searchMails:", error);
     throw new Error(

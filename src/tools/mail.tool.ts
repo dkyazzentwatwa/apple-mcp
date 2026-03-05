@@ -46,7 +46,8 @@ export async function handleMail(args: unknown) {
           parsed.searchTerm,
           parsed.limit || 10,
           parsed.account,
-          parsed.mailbox
+          parsed.mailbox,
+          parsed.searchScope
         );
         if (emails.length === 0) {
           return {

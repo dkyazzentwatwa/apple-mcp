@@ -10,6 +10,7 @@ const UnreadMailSchema = z.object({
 const SearchMailSchema = z.object({
   operation: z.literal('search'),
   searchTerm: z.string().min(1, 'searchTerm is required for search operation').max(500).describe('Text to search for in emails'),
+  searchScope: z.enum(['subject', 'sender', 'all']).optional().default('subject').describe("What to search: 'subject' (default, fast), 'sender' (by sender address/name), or 'all' (subject + content, slow for large mailboxes)"),
   account: z.string().max(200).optional().describe('Email account to search in'),
   mailbox: z.string().max(200).optional().describe('Mailbox to search in'),
   limit: z.number().positive().max(500).optional().describe('Number of emails to retrieve')

@@ -28,8 +28,61 @@ describe('CalendarArgsSchema', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject search without searchText', () => {
+    it('should accept search without searchText (schema level)', () => {
       const result = CalendarArgsSchema.safeParse({ operation: 'search' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept search with only location', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        location: 'Conference Room'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept search with only attendee', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        attendee: 'jane@example.com'
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept search with all filters combined', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        searchText: 'standup',
+        location: 'Office',
+        attendee: 'John',
+        fromDate: '2024-01-01',
+        toDate: '2025-12-31',
+        limit: 50
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject search with empty searchText', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        searchText: ''
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject search with empty location', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        location: ''
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject search with empty attendee', () => {
+      const result = CalendarArgsSchema.safeParse({
+        operation: 'search',
+        attendee: ''
+      });
       expect(result.success).toBe(false);
     });
   });

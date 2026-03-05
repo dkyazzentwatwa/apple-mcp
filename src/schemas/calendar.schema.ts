@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 const SearchEventsSchema = z.object({
   operation: z.literal('search'),
-  searchText: z.string().min(1, 'searchText is required for search operation').max(500).describe('Text to search for in event titles, locations, and notes'),
+  searchText: z.string().min(1).max(500).optional().describe('Text to search for in event titles, locations, and notes'),
+  location: z.string().min(1).max(500).optional().describe('Filter events by location (case-insensitive partial match)'),
+  attendee: z.string().min(1).max(500).optional().describe('Filter events by attendee name or email (case-insensitive partial match)'),
   fromDate: z.string().max(100).optional().describe('Start date for search range in ISO format (default is today)'),
   toDate: z.string().max(100).optional().describe('End date for search range in ISO format (default is 30 days from now)'),
   limit: z.number().positive().max(500).optional().describe('Number of events to retrieve')
